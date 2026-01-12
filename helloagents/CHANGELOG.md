@@ -16,7 +16,7 @@
 ### 修复
 - wecom/qinglong：token 刷新引入 singleflight，避免并发刷新击穿与上游限流风险
 - core：StateStore 增加后台定时清理，避免过期状态长期驻留
-- wecom：回调处理失败返回 5xx，触发企业微信重试避免消息丢失
+- wecom：回调增加请求体上限与短期去重，吸收重试并避免重复执行业务逻辑
 - main：配置加载失败不再 panic，改为日志输出并退出
 
 ### 变更

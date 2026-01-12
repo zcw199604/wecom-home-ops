@@ -20,6 +20,7 @@ type Server struct {
 	cfg        config.Config
 	server     *http.Server
 	stateStore *core.StateStore
+	deduper    *wecom.Deduper
 }
 
 func NewServer(cfg config.Config) (*Server, error) {
@@ -35,6 +36,7 @@ func NewServer(cfg config.Config) (*Server, error) {
 	}, httpClient)
 
 	stateStore := core.NewStateStore(cfg.Core.StateTTL.ToDuration())
+	deduper := wecom.NewDeduper(10 * time.Minute)
 
 	var providers []core.ServiceProvider
 
@@ -119,8 +121,9 @@ func NewServer(cfg config.Config) (*Server, error) {
 
 	mux.Handle("GET /wecom/callback", wecom.NewCallbackVerifyHandler(crypto))
 	mux.Handle("POST /wecom/callback", wecom.NewCallbackHandler(wecom.CallbackDeps{
-		Crypto: crypto,
-		Core:   router,
+		Crypto:  crypto,
+		Core:    router,
+		Deduper: deduper,
 	}))
 
 	s := &http.Server{
@@ -133,6 +136,7 @@ func NewServer(cfg config.Config) (*Server, error) {
 		cfg:        cfg,
 		server:     s,
 		stateStore: stateStore,
+		deduper:    deduper,
 	}, nil
 }
 
@@ -150,6 +154,9 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	err := s.server.Shutdown(ctx)
 	if s.stateStore != nil {
 		s.stateStore.Close()
+	}
+	if s.deduper != nil {
+		s.deduper.Close()
 	}
 	return err
 }

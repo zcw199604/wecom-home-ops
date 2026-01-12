@@ -2,15 +2,22 @@ package wecom
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/xml"
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 )
 
 type CallbackDeps struct {
-	Crypto *Crypto
-	Core   MessageHandler
+	Crypto  *Crypto
+	Core    MessageHandler
+	Deduper *Deduper
+	// MaxBodyBytes 限制回调请求体大小，避免恶意超大 body 导致内存/CPU 被占满。默认 1MiB。
+	MaxBodyBytes int64
 }
 
 type MessageHandler interface {
@@ -51,8 +58,19 @@ func NewCallbackHandler(deps CallbackDeps) http.Handler {
 		timestamp := r.URL.Query().Get("timestamp")
 		nonce := r.URL.Query().Get("nonce")
 
+		maxBody := deps.MaxBodyBytes
+		if maxBody <= 0 {
+			maxBody = 1 << 20
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, maxBody)
+
 		b, err := io.ReadAll(r.Body)
 		if err != nil {
+			var maxErr *http.MaxBytesError
+			if errors.As(err, &maxErr) {
+				http.Error(w, "payload too large", http.StatusRequestEntityTooLarge)
+				return
+			}
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
@@ -84,13 +102,51 @@ func NewCallbackHandler(deps CallbackDeps) http.Handler {
 			return
 		}
 
+		key := callbackDedupeKey(msg, plain)
+		if deps.Deduper != nil && key != "" {
+			if deps.Deduper.SeenOrMark(key) {
+				slog.Info("wecom callback 重复消息已忽略",
+					"user_id", strings.TrimSpace(msg.FromUserName),
+					"msg_type", strings.TrimSpace(msg.MsgType),
+					"event", strings.TrimSpace(msg.Event),
+					"event_key", strings.TrimSpace(msg.EventKey),
+					"task_id", strings.TrimSpace(msg.TaskId),
+					"msg_id", strings.TrimSpace(msg.MsgID),
+				)
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte("success"))
+				return
+			}
+		}
+
 		if err := deps.Core.HandleMessage(r.Context(), msg); err != nil {
-			slog.Error("wecom callback 处理失败", "error", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
+			slog.Error("wecom callback 处理失败（不触发重试）",
+				"error", err,
+				"user_id", strings.TrimSpace(msg.FromUserName),
+				"msg_type", strings.TrimSpace(msg.MsgType),
+				"event", strings.TrimSpace(msg.Event),
+				"event_key", strings.TrimSpace(msg.EventKey),
+				"task_id", strings.TrimSpace(msg.TaskId),
+				"msg_id", strings.TrimSpace(msg.MsgID),
+			)
 		}
 
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("success"))
 	})
+}
+
+func callbackDedupeKey(msg IncomingMessage, plain []byte) string {
+	user := strings.TrimSpace(msg.FromUserName)
+	if tid := strings.TrimSpace(msg.TaskId); tid != "" {
+		return fmt.Sprintf("task:%s:%s", user, tid)
+	}
+	if mid := strings.TrimSpace(msg.MsgID); mid != "" {
+		return fmt.Sprintf("msg:%s:%s", user, mid)
+	}
+	if len(plain) > 0 {
+		sum := sha256.Sum256(plain)
+		return fmt.Sprintf("sha256:%x", sum[:])
+	}
+	return ""
 }

@@ -5,10 +5,12 @@ package wecom
 type IncomingMessage struct {
 	ToUserName   string `xml:"ToUserName"`
 	FromUserName string `xml:"FromUserName"`
+	CreateTime   int64  `xml:"CreateTime"`
 	MsgType      string `xml:"MsgType"`
 	Content      string `xml:"Content"`
 	Event        string `xml:"Event"`
 	EventKey     string `xml:"EventKey"`
+	MsgID        string `xml:"MsgId"`
 	TaskId       string `xml:"TaskId"`
 	CardType     string `xml:"CardType"`
 }
