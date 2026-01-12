@@ -20,3 +20,11 @@
 - **命令:** `go test ./...`
 - **提交:** 建议每次提交聚焦单一主题（初始化/功能/修复/文档）
 
+## CI/CD 与镜像发布
+- **Docker 镜像构建:** `Dockerfile`（多阶段构建，默认入口 `-config /config/config.yaml`）
+- **GitHub Actions:** push 到 `main` 时自动构建并推送 Docker Hub（见 `.github/workflows/dockerhub.yml`）
+- **必需 Secrets:**
+  - `DOCKERHUB_USERNAME`: Docker Hub 用户名
+  - `DOCKERHUB_TOKEN`: Docker Hub Access Token（建议使用 Token 而非密码）
+- **可选 Secrets:**
+  - `DOCKERHUB_REPOSITORY`: 完整镜像名（如 `yourname/daily-help`）；未设置时默认 `DOCKERHUB_USERNAME/<GitHub仓库名>`

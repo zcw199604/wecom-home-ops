@@ -9,6 +9,7 @@
 | 时间戳 | 功能名称 | 类型 | 状态 | 方案包路径 |
 |--------|----------|------|------|------------|
 | 202601120816 | wecom_unraid | 功能 | ✅已完成 | [202601120816_wecom_unraid](2026-01/202601120816_wecom_unraid/) |
+| 202601120954 | cicd_dockerhub | 功能 | ✅已完成 | [202601120954_cicd_dockerhub](2026-01/202601120954_cicd_dockerhub/) |
 
 ---
 
@@ -17,3 +18,4 @@
 ### 2026-01
 
 - [202601120816_wecom_unraid](2026-01/202601120816_wecom_unraid/) - 企业微信对接 Unraid 容器管理（MVP）
+- [202601120954_cicd_dockerhub](2026-01/202601120954_cicd_dockerhub/) - GitHub Actions 构建并推送 Docker Hub 镜像

@@ -6,6 +6,9 @@
 
 ## [Unreleased]
 
+### 新增
+- GitHub Actions：push 到 main 时构建并推送 Docker Hub 镜像
+
 ## [0.1.0] - 2026-01-12
 
 ### 新增

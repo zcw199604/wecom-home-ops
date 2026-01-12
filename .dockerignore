@@ -1,0 +1,9 @@
+.git
+.github
+helloagents
+**/*.md
+config.yaml
+tmp
+dist
+build
+
