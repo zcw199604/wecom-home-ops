@@ -8,6 +8,7 @@
 
 ### 新增
 - GitHub Actions：push 到 main 时构建并推送 Docker Hub 镜像
+- 企业微信：Unraid 容器查看（状态/运行时长/资源使用/最新日志）
 
 ## [0.1.0] - 2026-01-12
 

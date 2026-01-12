@@ -1,3 +1,4 @@
+// Package unraid 封装 Unraid Connect GraphQL API 的容器管理与查询能力。
 package unraid
 
 import (
@@ -10,6 +11,8 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 )
 
 type ClientConfig struct {
@@ -22,6 +25,11 @@ type ClientConfig struct {
 type Client struct {
 	cfg        ClientConfig
 	httpClient *http.Client
+
+	mu               sync.Mutex
+	inspectMeta      containerInspectMeta
+	inspectMetaExpAt time.Time
+	inspectMetaOK    bool
 }
 
 func NewClient(cfg ClientConfig, httpClient *http.Client) *Client {
@@ -92,24 +100,143 @@ func (c *Client) ForceUpdateContainerByName(ctx context.Context, name string) er
 	return c.callDockerForceUpdateMutation(ctx, meta, id)
 }
 
+type ContainerStatus struct {
+	ID     string
+	Name   string
+	State  string
+	Status string
+	Uptime string
+}
+
+type ContainerStats struct {
+	ID    string
+	Name  string
+	Stats interface{}
+}
+
+type ContainerLogs struct {
+	ID    string
+	Name  string
+	Tail  int
+	Logs  string
+	Trunc bool
+}
+
+func (c *Client) GetContainerStatusByName(ctx context.Context, name string) (ContainerStatus, error) {
+	ct, err := c.findContainerByName(ctx, name)
+	if err != nil {
+		return ContainerStatus{}, err
+	}
+	return ContainerStatus{
+		ID:     ct.ID,
+		Name:   ct.Name,
+		State:  ct.State,
+		Status: ct.Status,
+		Uptime: parseUptimeFromDockerStatus(ct.Status),
+	}, nil
+}
+
+func (c *Client) GetContainerStatsByName(ctx context.Context, name string) (ContainerStats, error) {
+	meta, err := c.getContainerInspectMeta(ctx)
+	if err != nil {
+		return ContainerStats{}, err
+	}
+	if meta.ContainerTypeName == "" || meta.StatsField == nil {
+		return ContainerStats{}, errors.New("当前 Unraid GraphQL API 未发现可用的资源统计字段（可能需要升级 Unraid Connect 插件或更换实现路径）")
+	}
+
+	fieldExpr, err := c.buildStatsFieldExpr(ctx, *meta.StatsField)
+	if err != nil {
+		return ContainerStats{}, err
+	}
+
+	ct, v, err := c.queryContainerExtraByName(ctx, name, meta.StatsField.Name, fieldExpr, "", nil)
+	if err != nil {
+		return ContainerStats{}, err
+	}
+
+	return ContainerStats{
+		ID:    ct.ID,
+		Name:  ct.Name,
+		Stats: v,
+	}, nil
+}
+
+func (c *Client) GetContainerLogsByName(ctx context.Context, name string, tail int) (ContainerLogs, error) {
+	tail = clampInt(tail, 1, 200)
+	meta, err := c.getContainerInspectMeta(ctx)
+	if err != nil {
+		return ContainerLogs{}, err
+	}
+	if meta.ContainerTypeName == "" || meta.LogsField == nil {
+		return ContainerLogs{}, errors.New("当前 Unraid GraphQL API 未发现可用的日志查询字段（可能需要升级 Unraid Connect 插件或更换实现路径）")
+	}
+
+	fieldExpr, varDef, vars, extractPath, err := c.buildLogsFieldExpr(ctx, *meta.LogsField, tail)
+	if err != nil {
+		return ContainerLogs{}, err
+	}
+
+	ct, v, err := c.queryContainerExtraByName(ctx, name, meta.LogsField.Name, fieldExpr, varDef, vars)
+	if err != nil {
+		return ContainerLogs{}, err
+	}
+
+	raw, ok := extractByPath(v, extractPath)
+	if !ok {
+		raw = v
+	}
+
+	logs, ok := stringifyGraphQLValue(raw)
+	if !ok {
+		return ContainerLogs{}, fmt.Errorf("日志返回类型不支持: %T", raw)
+	}
+
+	logs, truncated := tailLines(logs, tail)
+
+	return ContainerLogs{
+		ID:    ct.ID,
+		Name:  ct.Name,
+		Tail:  tail,
+		Logs:  logs,
+		Trunc: truncated,
+	}, nil
+}
+
 var (
 	ErrAlreadyStopped = errors.New("container already stopped")
 	ErrAlreadyStarted = errors.New("container already started")
 )
 
+type containerInfo struct {
+	ID     string
+	Name   string
+	State  string
+	Status string
+}
+
 func (c *Client) findContainerIDByName(ctx context.Context, name string) (string, error) {
+	ct, err := c.findContainerByName(ctx, name)
+	if err != nil {
+		return "", err
+	}
+	return ct.ID, nil
+}
+
+func (c *Client) findContainerByName(ctx context.Context, name string) (containerInfo, error) {
 	const q = `query { docker { containers { id names state status } } }`
 	var resp struct {
 		Docker struct {
 			Containers []struct {
-				ID    string      `json:"id"`
-				Names interface{} `json:"names"`
-				State string      `json:"state"`
+				ID     string      `json:"id"`
+				Names  interface{} `json:"names"`
+				State  string      `json:"state"`
+				Status string      `json:"status"`
 			} `json:"containers"`
 		} `json:"docker"`
 	}
 	if err := c.do(ctx, q, nil, &resp); err != nil {
-		return "", err
+		return containerInfo{}, err
 	}
 
 	seen := make(map[string]struct{}, 64)
@@ -119,7 +246,12 @@ func (c *Client) findContainerIDByName(ctx context.Context, name string) (string
 		for _, n := range normalizeContainerNames(ct.Names) {
 			nn := normalizeName(n)
 			if nn == want {
-				return normalizePrefixedID(ct.ID), nil
+				return containerInfo{
+					ID:     normalizePrefixedID(ct.ID),
+					Name:   nn,
+					State:  ct.State,
+					Status: ct.Status,
+				}, nil
 			}
 			if nn == "" {
 				continue
@@ -138,9 +270,9 @@ func (c *Client) findContainerIDByName(ctx context.Context, name string) (string
 		if len(candidates) > max {
 			candidates = candidates[:max]
 		}
-		return "", fmt.Errorf("未找到容器：%s（可选容器示例：%s）", name, strings.Join(candidates, ", "))
+		return containerInfo{}, fmt.Errorf("未找到容器：%s（可选容器示例：%s）", name, strings.Join(candidates, ", "))
 	}
-	return "", fmt.Errorf("未找到容器：%s", name)
+	return containerInfo{}, fmt.Errorf("未找到容器：%s", name)
 }
 
 func (c *Client) stopContainer(ctx context.Context, id string) error {
@@ -258,6 +390,445 @@ func (c *Client) do(ctx context.Context, query string, variables map[string]inte
 		return nil
 	}
 	return json.Unmarshal(raw.Data, out)
+}
+
+type containerInspectMeta struct {
+	DockerQueryTypeName string
+	ContainerTypeName   string
+	LogsField           *gqlFieldMeta
+	StatsField          *gqlFieldMeta
+}
+
+func (c *Client) getContainerInspectMeta(ctx context.Context) (containerInspectMeta, error) {
+	c.mu.Lock()
+	if c.inspectMetaOK && time.Now().Before(c.inspectMetaExpAt) {
+		meta := c.inspectMeta
+		c.mu.Unlock()
+		return meta, nil
+	}
+	c.mu.Unlock()
+
+	meta, err := c.detectContainerInspectMeta(ctx)
+	if err != nil {
+		return containerInspectMeta{}, err
+	}
+
+	c.mu.Lock()
+	c.inspectMeta = meta
+	c.inspectMetaOK = true
+	c.inspectMetaExpAt = time.Now().Add(10 * time.Minute)
+	c.mu.Unlock()
+	return meta, nil
+}
+
+func (c *Client) detectContainerInspectMeta(ctx context.Context) (containerInspectMeta, error) {
+	dockerTypeName, err := c.lookupDockerQueryTypeName(ctx)
+	if err != nil {
+		return containerInspectMeta{}, err
+	}
+	if dockerTypeName == "" {
+		return containerInspectMeta{}, nil
+	}
+
+	fields, err := c.lookupTypeFieldsMeta(ctx, dockerTypeName)
+	if err != nil {
+		return containerInspectMeta{}, err
+	}
+
+	containersField, ok := fields["containers"]
+	if !ok {
+		return containerInspectMeta{}, nil
+	}
+
+	containerTypeName := containersField.Type.NamedTypeName()
+	if containerTypeName == "" {
+		return containerInspectMeta{}, nil
+	}
+
+	containerFields, err := c.lookupTypeFieldsMeta(ctx, containerTypeName)
+	if err != nil {
+		return containerInspectMeta{}, err
+	}
+
+	var logsField *gqlFieldMeta
+	if f, ok := pickField(containerFields, []string{
+		"logs",
+		"log",
+		"containerLogs",
+		"dockerLogs",
+	}); ok {
+		ff := f
+		logsField = &ff
+	} else if f, ok := pickFieldByContains(containerFields, []string{"log"}); ok {
+		ff := f
+		logsField = &ff
+	}
+
+	var statsField *gqlFieldMeta
+	if f, ok := pickField(containerFields, []string{
+		"stats",
+		"stat",
+		"metrics",
+	}); ok {
+		ff := f
+		statsField = &ff
+	} else if f, ok := pickFieldByContains(containerFields, []string{"stat", "metric"}); ok {
+		ff := f
+		statsField = &ff
+	}
+
+	return containerInspectMeta{
+		DockerQueryTypeName: dockerTypeName,
+		ContainerTypeName:   containerTypeName,
+		LogsField:           logsField,
+		StatsField:          statsField,
+	}, nil
+}
+
+func (c *Client) lookupDockerQueryTypeName(ctx context.Context) (string, error) {
+	const q = `query { __schema { queryType { fields { name type { name kind ofType { name kind ofType { name kind } } } } } } }`
+	var resp struct {
+		Schema struct {
+			QueryType struct {
+				Fields []struct {
+					Name string `json:"name"`
+					Type struct {
+						Name   string `json:"name"`
+						Kind   string `json:"kind"`
+						OfType *struct {
+							Name   string `json:"name"`
+							Kind   string `json:"kind"`
+							OfType *struct {
+								Name string `json:"name"`
+								Kind string `json:"kind"`
+							} `json:"ofType"`
+						} `json:"ofType"`
+					} `json:"type"`
+				} `json:"fields"`
+			} `json:"queryType"`
+		} `json:"__schema"`
+	}
+	if err := c.do(ctx, q, nil, &resp); err != nil {
+		return "", err
+	}
+
+	for _, f := range resp.Schema.QueryType.Fields {
+		if f.Name != "docker" {
+			continue
+		}
+		if f.Type.Name != "" {
+			return f.Type.Name, nil
+		}
+		if f.Type.OfType != nil && f.Type.OfType.Name != "" {
+			return f.Type.OfType.Name, nil
+		}
+	}
+	return "", nil
+}
+
+func (c *Client) queryContainerExtraByName(
+	ctx context.Context,
+	name string,
+	fieldName string,
+	fieldExpr string,
+	varDef string,
+	vars map[string]interface{},
+) (containerInfo, interface{}, error) {
+	varDef = strings.TrimSpace(varDef)
+	header := "query"
+	if varDef != "" {
+		header += varDef
+	}
+	q := fmt.Sprintf(`%s { docker { containers { id names state status %s } } }`, header, fieldExpr)
+
+	var raw map[string]interface{}
+	if err := c.do(ctx, q, vars, &raw); err != nil {
+		return containerInfo{}, nil, err
+	}
+
+	dockerObj, _ := raw["docker"].(map[string]interface{})
+	list, _ := dockerObj["containers"].([]interface{})
+
+	ct, m, err := pickContainerObjectByName(list, name)
+	if err != nil {
+		return containerInfo{}, nil, err
+	}
+
+	v := m[fieldName]
+	return ct, v, nil
+}
+
+func pickContainerObjectByName(containers []interface{}, name string) (containerInfo, map[string]interface{}, error) {
+	want := normalizeName(name)
+	seen := make(map[string]struct{}, 64)
+	var candidates []string
+
+	for _, item := range containers {
+		m, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		id, _ := m["id"].(string)
+		state, _ := m["state"].(string)
+		status, _ := m["status"].(string)
+		for _, n := range normalizeContainerNames(m["names"]) {
+			nn := normalizeName(n)
+			if nn == want {
+				return containerInfo{
+					ID:     normalizePrefixedID(id),
+					Name:   nn,
+					State:  state,
+					Status: status,
+				}, m, nil
+			}
+			if nn == "" {
+				continue
+			}
+			if _, ok := seen[nn]; ok {
+				continue
+			}
+			seen[nn] = struct{}{}
+			candidates = append(candidates, nn)
+		}
+	}
+
+	sort.Strings(candidates)
+	if len(candidates) > 0 {
+		const max = 10
+		if len(candidates) > max {
+			candidates = candidates[:max]
+		}
+		return containerInfo{}, nil, fmt.Errorf("未找到容器：%s（可选容器示例：%s）", name, strings.Join(candidates, ", "))
+	}
+	return containerInfo{}, nil, fmt.Errorf("未找到容器：%s", name)
+}
+
+func (c *Client) buildStatsFieldExpr(ctx context.Context, field gqlFieldMeta) (string, error) {
+	for _, a := range field.Args {
+		if a.Type.Kind == "NON_NULL" {
+			return "", fmt.Errorf("资源统计字段需要必填参数，暂不支持: %s.%s", c.inspectMeta.ContainerTypeName, field.Name)
+		}
+	}
+
+	if !field.Type.RequiresSelectionSet() {
+		return field.Name, nil
+	}
+
+	typeName := field.Type.NamedTypeName()
+	if typeName == "" {
+		return field.Name + ` { __typename }`, nil
+	}
+
+	fields, err := c.lookupTypeFieldsMeta(ctx, typeName)
+	if err != nil {
+		return field.Name + ` { __typename }`, nil
+	}
+
+	var picks []string
+	for name, meta := range fields {
+		if meta.Type.RequiresSelectionSet() {
+			continue
+		}
+		picks = append(picks, name)
+	}
+	sort.Strings(picks)
+	if len(picks) == 0 {
+		picks = []string{"__typename"}
+	}
+	return field.Name + " { " + strings.Join(picks, " ") + " }", nil
+}
+
+func (c *Client) buildLogsFieldExpr(ctx context.Context, field gqlFieldMeta, tail int) (fieldExpr string, varDef string, vars map[string]interface{}, extractPath []string, err error) {
+	limitArg, ok := pickLogsLimitArg(field.Args)
+	if ok {
+		varDef = fmt.Sprintf("($tail: %s)", limitArg.Type.String())
+		vars = map[string]interface{}{"tail": tail}
+		fieldExpr = fmt.Sprintf("%s(%s: $tail)", field.Name, limitArg.Name)
+	} else {
+		fieldExpr = field.Name
+	}
+
+	for _, a := range field.Args {
+		if a.Type.Kind != "NON_NULL" {
+			continue
+		}
+		if ok && a.Name == limitArg.Name {
+			continue
+		}
+		return "", "", nil, nil, fmt.Errorf("日志字段需要必填参数，暂不支持: %s.%s", c.inspectMeta.ContainerTypeName, field.Name)
+	}
+
+	if !field.Type.RequiresSelectionSet() {
+		return fieldExpr, varDef, vars, nil, nil
+	}
+
+	typeName := field.Type.NamedTypeName()
+	if typeName == "" {
+		return "", "", nil, nil, fmt.Errorf("日志字段返回类型未知，暂不支持: %s.%s", c.inspectMeta.ContainerTypeName, field.Name)
+	}
+
+	fields, err2 := c.lookupTypeFieldsMeta(ctx, typeName)
+	if err2 != nil {
+		return "", "", nil, nil, fmt.Errorf("日志字段返回类型 introspection 失败: %v", err2)
+	}
+
+	payload, payloadPath, ok := pickLogsPayloadField(fields)
+	if !ok {
+		return "", "", nil, nil, fmt.Errorf("日志字段返回类型结构复杂，暂不支持: %s", typeName)
+	}
+
+	if payload.Type.RequiresSelectionSet() {
+		return "", "", nil, nil, fmt.Errorf("日志字段返回类型结构复杂，暂不支持: %s.%s", typeName, payload.Name)
+	}
+
+	fieldExpr = fieldExpr + fmt.Sprintf(" { %s }", payload.Name)
+	return fieldExpr, varDef, vars, payloadPath, nil
+}
+
+func pickLogsLimitArg(args []gqlArgMeta) (gqlArgMeta, bool) {
+	prefer := []string{"tail", "lines", "limit", "count", "n"}
+	for _, name := range prefer {
+		for _, a := range args {
+			if a.Name == name {
+				return a, true
+			}
+		}
+	}
+	for _, a := range args {
+		lower := strings.ToLower(a.Name)
+		if strings.Contains(lower, "tail") || strings.Contains(lower, "line") || strings.Contains(lower, "limit") || strings.Contains(lower, "count") {
+			return a, true
+		}
+	}
+	return gqlArgMeta{}, false
+}
+
+func pickLogsPayloadField(fields map[string]gqlFieldMeta) (gqlFieldMeta, []string, bool) {
+	prefer := []string{"lines", "content", "text", "message", "log", "logs", "value", "raw", "data"}
+	for _, name := range prefer {
+		if f, ok := fields[name]; ok {
+			return f, []string{name}, true
+		}
+	}
+	for name, f := range fields {
+		lower := strings.ToLower(name)
+		if strings.Contains(lower, "line") || strings.Contains(lower, "content") || strings.Contains(lower, "text") || strings.Contains(lower, "message") {
+			return f, []string{name}, true
+		}
+	}
+	return gqlFieldMeta{}, nil, false
+}
+
+func pickField(fields map[string]gqlFieldMeta, candidates []string) (gqlFieldMeta, bool) {
+	for _, name := range candidates {
+		if f, ok := fields[name]; ok {
+			return f, true
+		}
+	}
+	return gqlFieldMeta{}, false
+}
+
+func pickFieldByContains(fields map[string]gqlFieldMeta, keywords []string) (gqlFieldMeta, bool) {
+	var names []string
+	for n := range fields {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		lower := strings.ToLower(name)
+		for _, kw := range keywords {
+			if strings.Contains(lower, strings.ToLower(kw)) {
+				return fields[name], true
+			}
+		}
+	}
+	return gqlFieldMeta{}, false
+}
+
+func (t gqlTypeRef) NamedTypeName() string {
+	if t.Name != "" {
+		return t.Name
+	}
+	if t.OfType != nil {
+		return t.OfType.NamedTypeName()
+	}
+	return ""
+}
+
+func clampInt(v, minV, maxV int) int {
+	if v < minV {
+		return minV
+	}
+	if v > maxV {
+		return maxV
+	}
+	return v
+}
+
+func extractByPath(v interface{}, path []string) (interface{}, bool) {
+	cur := v
+	for _, p := range path {
+		m, ok := cur.(map[string]interface{})
+		if !ok {
+			return nil, false
+		}
+		cur, ok = m[p]
+		if !ok {
+			return nil, false
+		}
+	}
+	return cur, true
+}
+
+func stringifyGraphQLValue(v interface{}) (string, bool) {
+	switch vv := v.(type) {
+	case nil:
+		return "", true
+	case string:
+		return vv, true
+	case []interface{}:
+		var lines []string
+		for _, item := range vv {
+			s, ok := item.(string)
+			if !ok {
+				continue
+			}
+			lines = append(lines, s)
+		}
+		return strings.Join(lines, "\n"), true
+	default:
+		return "", false
+	}
+}
+
+func tailLines(s string, want int) (string, bool) {
+	if want <= 0 {
+		return s, false
+	}
+	lines := strings.Split(s, "\n")
+	if len(lines) <= want {
+		return s, false
+	}
+	return strings.Join(lines[len(lines)-want:], "\n"), true
+}
+
+func parseUptimeFromDockerStatus(status string) string {
+	s := strings.TrimSpace(status)
+	if s == "" {
+		return ""
+	}
+	if strings.HasPrefix(s, "Up ") {
+		s = strings.TrimSpace(strings.TrimPrefix(s, "Up "))
+	} else if strings.HasPrefix(s, "Up") {
+		s = strings.TrimSpace(strings.TrimPrefix(s, "Up"))
+	} else {
+		return ""
+	}
+	if idx := strings.Index(s, "("); idx >= 0 {
+		s = strings.TrimSpace(s[:idx])
+	}
+	return s
 }
 
 type dockerMutationMeta struct {

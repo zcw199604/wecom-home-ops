@@ -1,8 +1,11 @@
+// Package core 提供企业微信会话的动作路由与状态管理。
 package core
 
 import (
 	"sync"
 	"time"
+
+	"daily-help/internal/wecom"
 )
 
 type Step string
@@ -18,16 +21,29 @@ const (
 	ActionRestart     Action = "restart"
 	ActionStop        Action = "stop"
 	ActionForceUpdate Action = "force_update"
+
+	ActionViewStatus      Action = "view_status"
+	ActionViewStats       Action = "view_stats"
+	ActionViewStatsDetail Action = "view_stats_detail"
+	ActionViewLogs        Action = "view_logs"
 )
 
 func ActionFromEventKey(key string) Action {
 	switch key {
-	case "unraid.action.restart":
+	case wecom.EventKeyUnraidRestart:
 		return ActionRestart
-	case "unraid.action.stop":
+	case wecom.EventKeyUnraidStop:
 		return ActionStop
-	case "unraid.action.force_update":
+	case wecom.EventKeyUnraidForceUpdate:
 		return ActionForceUpdate
+	case wecom.EventKeyUnraidViewStatus:
+		return ActionViewStatus
+	case wecom.EventKeyUnraidViewStats:
+		return ActionViewStats
+	case wecom.EventKeyUnraidViewStatsDetail:
+		return ActionViewStatsDetail
+	case wecom.EventKeyUnraidViewLogs:
+		return ActionViewLogs
 	default:
 		return ""
 	}
@@ -41,8 +57,25 @@ func (a Action) DisplayName() string {
 		return "停止"
 	case ActionForceUpdate:
 		return "强制更新"
+	case ActionViewStatus:
+		return "查看状态"
+	case ActionViewStats:
+		return "资源概览"
+	case ActionViewStatsDetail:
+		return "资源详情"
+	case ActionViewLogs:
+		return "查看日志"
 	default:
 		return "未知动作"
+	}
+}
+
+func (a Action) RequiresConfirm() bool {
+	switch a {
+	case ActionRestart, ActionStop, ActionForceUpdate:
+		return true
+	default:
+		return false
 	}
 }
 

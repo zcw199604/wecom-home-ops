@@ -1,3 +1,4 @@
+// Package wecom 封装企业微信自建应用的消息收发与交互卡片构建。
 package wecom
 
 type IncomingMessage struct {
@@ -12,9 +13,19 @@ type IncomingMessage struct {
 }
 
 const (
+	EventKeyUnraidMenuOps  = "unraid.menu.ops"
+	EventKeyUnraidMenuView = "unraid.menu.view"
+
 	EventKeyUnraidRestart     = "unraid.action.restart"
 	EventKeyUnraidStop        = "unraid.action.stop"
 	EventKeyUnraidForceUpdate = "unraid.action.force_update"
+
+	EventKeyUnraidViewStatus      = "unraid.view.status"
+	EventKeyUnraidViewStats       = "unraid.view.stats"
+	EventKeyUnraidViewStatsDetail = "unraid.view.stats_detail"
+	EventKeyUnraidViewLogs        = "unraid.view.logs"
+
+	EventKeyUnraidBackToMenu = "unraid.menu.back"
 
 	EventKeyConfirm = "core.action.confirm"
 	EventKeyCancel  = "core.action.cancel"
@@ -32,7 +43,29 @@ type TemplateCardMessage struct {
 
 type TemplateCard map[string]interface{}
 
-func NewUnraidActionCard() TemplateCard {
+func NewUnraidEntryCard() TemplateCard {
+	return TemplateCard{
+		"card_type": "button_interaction",
+		"main_title": map[string]interface{}{
+			"title": "Unraid 容器",
+			"desc":  "请选择菜单",
+		},
+		"button_list": []map[string]interface{}{
+			{
+				"text":  "容器操作",
+				"style": 1,
+				"key":   EventKeyUnraidMenuOps,
+			},
+			{
+				"text":  "容器查看",
+				"style": 2,
+				"key":   EventKeyUnraidMenuView,
+			},
+		},
+	}
+}
+
+func NewUnraidOpsCard() TemplateCard {
 	return TemplateCard{
 		"card_type": "button_interaction",
 		"main_title": map[string]interface{}{
@@ -54,6 +87,48 @@ func NewUnraidActionCard() TemplateCard {
 				"text":  "强制更新",
 				"style": 2,
 				"key":   EventKeyUnraidForceUpdate,
+			},
+			{
+				"text":  "返回菜单",
+				"style": 1,
+				"key":   EventKeyUnraidBackToMenu,
+			},
+		},
+	}
+}
+
+func NewUnraidViewCard() TemplateCard {
+	return TemplateCard{
+		"card_type": "button_interaction",
+		"main_title": map[string]interface{}{
+			"title": "Unraid 容器查看",
+			"desc":  "请选择信息类型",
+		},
+		"button_list": []map[string]interface{}{
+			{
+				"text":  "查看状态",
+				"style": 1,
+				"key":   EventKeyUnraidViewStatus,
+			},
+			{
+				"text":  "资源概览",
+				"style": 1,
+				"key":   EventKeyUnraidViewStats,
+			},
+			{
+				"text":  "资源详情",
+				"style": 2,
+				"key":   EventKeyUnraidViewStatsDetail,
+			},
+			{
+				"text":  "查看日志",
+				"style": 2,
+				"key":   EventKeyUnraidViewLogs,
+			},
+			{
+				"text":  "返回菜单",
+				"style": 1,
+				"key":   EventKeyUnraidBackToMenu,
 			},
 		},
 	}
