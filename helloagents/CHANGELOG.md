@@ -25,6 +25,7 @@
 - wecom：回调增加请求体上限与短期去重，吸收重试并避免重复执行业务逻辑
 - wecom：增强发送消息/gettoken/update_template_card 的结构化日志；message/send 返回 invaliduser 等不可达信息时输出告警并返回错误
 - app/wecom：回调与请求日志增强（GET/POST 回调增加验签/解密/解析阶段日志；请求日志增加 status_code/response_bytes）
+- config：配置加载日志增强（输出 config 文件 path/sha256/size/mtime；打印脱敏配置摘要用于确认容器挂载是否生效）
 - main：配置加载失败不再 panic，改为日志输出并退出
 
 ### 变更

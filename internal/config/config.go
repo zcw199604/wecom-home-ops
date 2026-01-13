@@ -2,6 +2,7 @@ package config
 
 // config.go 负责加载与校验 YAML 配置，并提供默认值填充。
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -130,20 +131,65 @@ var qinglongInstanceIDPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,
 var graphqlIdentifierPattern = regexp.MustCompile(`^[_A-Za-z][_0-9A-Za-z]*$`)
 
 func Load(path string) (Config, error) {
+	fields := []any{
+		"path", path,
+	}
+	if wd, err := os.Getwd(); err == nil && wd != "" {
+		fields = append(fields, "cwd", wd)
+	}
+	if fi, err := os.Stat(path); err == nil {
+		fields = append(fields,
+			"file_size", fi.Size(),
+			"file_mod_time", fi.ModTime().Format(time.RFC3339),
+		)
+	}
+	slog.Info("读取配置文件", fields...)
+
 	b, err := os.ReadFile(path)
 	if err != nil {
+		slog.Error("读取配置文件失败", "path", path, "error", err)
 		return Config{}, err
 	}
+	sum := sha256.Sum256(b)
+	slog.Info("配置文件读取成功",
+		"path", path,
+		"file_bytes", len(b),
+		"file_sha256", fmt.Sprintf("%x", sum[:]),
+	)
 
 	var cfg Config
 	if err := yaml.Unmarshal(b, &cfg); err != nil {
+		slog.Error("解析配置文件失败（YAML）", "path", path, "error", err)
 		return Config{}, err
 	}
 
 	applyDefaults(&cfg)
 	if err := validate(cfg); err != nil {
+		slog.Error("配置校验失败", "path", path, "error", err)
 		return Config{}, err
 	}
+
+	slog.Info("配置加载成功（敏感字段已脱敏）",
+		"server.listen_addr", cfg.Server.ListenAddr,
+		"server.base_url_set", strings.TrimSpace(cfg.Server.BaseURL) != "",
+		"server.http_client_timeout", cfg.Server.HTTPClientTimeout.ToDuration().String(),
+		"server.read_header_timeout", cfg.Server.ReadHeaderTimeout.ToDuration().String(),
+		"core.state_ttl", cfg.Core.StateTTL.ToDuration().String(),
+		"log.level", string(cfg.Log.Level),
+
+		"wecom.corpid", maskSensitive(cfg.WeCom.CorpID),
+		"wecom.agentid", cfg.WeCom.AgentID,
+		"wecom.api_base_url", cfg.WeCom.APIBaseURL,
+		"wecom.token_len", len(cfg.WeCom.Token),
+		"wecom.encoding_aes_key_len", len(cfg.WeCom.EncodingAESKey),
+		"wecom.secret_len", len(cfg.WeCom.Secret),
+
+		"auth.allowed_userids_count", len(cfg.Auth.AllowedUserIDs),
+		"auth.allowed_userids_sample", maskSensitiveSlice(cfg.Auth.AllowedUserIDs, 3),
+
+		"unraid.enabled", strings.TrimSpace(cfg.Unraid.Endpoint) != "" && strings.TrimSpace(cfg.Unraid.APIKey) != "",
+		"qinglong.instances_count", len(cfg.Qinglong.Instances),
+	)
 
 	return cfg, nil
 }
@@ -402,4 +448,33 @@ func isGraphQLTypeRef(s string) bool {
 		return false
 	}
 	return i == len(input)
+}
+
+func maskSensitive(s string) string {
+	input := strings.TrimSpace(s)
+	if input == "" {
+		return ""
+	}
+	if len(input) <= 2 {
+		return "**"
+	}
+	if len(input) <= 8 {
+		return input[:1] + strings.Repeat("*", len(input)-2) + input[len(input)-1:]
+	}
+	return input[:3] + strings.Repeat("*", len(input)-6) + input[len(input)-3:]
+}
+
+func maskSensitiveSlice(ss []string, max int) []string {
+	if len(ss) == 0 || max <= 0 {
+		return nil
+	}
+	n := len(ss)
+	if n > max {
+		n = max
+	}
+	out := make([]string, 0, n)
+	for i := 0; i < n; i++ {
+		out = append(out, maskSensitive(ss[i]))
+	}
+	return out
 }
