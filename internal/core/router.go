@@ -258,6 +258,17 @@ func (r *Router) handleEvent(ctx context.Context, userID string, msg wecom.Incom
 		return r.enterProvider(ctx, userID, serviceKey)
 	}
 
+	if strings.HasPrefix(key, "unraid.") {
+		if _, ok := r.providers["unraid"]; !ok {
+			return r.sendServiceUnavailable(ctx, userID, "unraid")
+		}
+	}
+	if strings.HasPrefix(key, "qinglong.") {
+		if _, ok := r.providers["qinglong"]; !ok {
+			return r.sendServiceUnavailable(ctx, userID, "qinglong")
+		}
+	}
+
 	if serviceKey := r.providerKeyFromEventKey(key); serviceKey != "" {
 		p := r.providers[serviceKey]
 		handled, err := p.HandleEvent(ctx, userID, msg)
@@ -281,6 +292,12 @@ func (r *Router) handleEvent(ctx context.Context, userID string, msg wecom.Incom
 		}
 	}
 
+	if isClickEvent {
+		return r.WeCom.SendText(ctx, wecom.TextMessage{
+			ToUser:  userID,
+			Content: "未识别的菜单操作，请发送“同步菜单”更新，或输入“帮助”。",
+		})
+	}
 	return nil
 }
 
@@ -397,6 +414,17 @@ func isSelfTestKeyword(normalized string) bool {
 	default:
 		return false
 	}
+}
+
+func (r *Router) sendServiceUnavailable(ctx context.Context, userID string, serviceKey string) error {
+	msg := "服务未启用：" + serviceKey + "。请检查 config.yaml 配置后重启服务。"
+	switch serviceKey {
+	case "unraid":
+		msg = "Unraid 服务未启用：请在 config.yaml 配置 unraid.endpoint 与 unraid.api_key 后重启服务。"
+	case "qinglong":
+		msg = "青龙(QL) 服务未启用：请在 config.yaml 配置 qinglong.instances 后重启服务。"
+	}
+	return r.WeCom.SendText(ctx, wecom.TextMessage{ToUser: userID, Content: msg})
 }
 
 func (r *Router) sendHelp(ctx context.Context, userID string) error {

@@ -256,6 +256,40 @@ func TestRouter_SyncMenu_CallsCreateMenu(t *testing.T) {
 	}
 }
 
+func TestRouter_ClickUnraidWhenProviderMissing_RepliesServiceUnavailable(t *testing.T) {
+	t.Parallel()
+
+	rec := &recordWeCom{}
+	userID := "u"
+
+	r := NewRouter(RouterDeps{
+		WeCom: rec,
+		AllowedUserID: map[string]struct{}{
+			userID: {},
+		},
+		State: NewStateStore(1 * time.Minute),
+	})
+
+	if err := r.HandleMessage(context.Background(), wecom.IncomingMessage{
+		FromUserName: userID,
+		MsgType:      "event",
+		Event:        "CLICK",
+		EventKey:     "unraid.menu.view",
+	}); err != nil {
+		t.Fatalf("HandleMessage() error: %v", err)
+	}
+
+	if got := len(rec.texts); got != 1 {
+		t.Fatalf("text message count = %d, want 1", got)
+	}
+	if got := len(rec.cards); got != 0 {
+		t.Fatalf("template card count = %d, want 0", got)
+	}
+	if !strings.Contains(rec.texts[0].Content, "Unraid 服务未启用") {
+		t.Fatalf("reply = %q, want contains %q", rec.texts[0].Content, "Unraid 服务未启用")
+	}
+}
+
 func TestRouter_EventPrefix_DispatchesToProvider(t *testing.T) {
 	t.Parallel()
 
