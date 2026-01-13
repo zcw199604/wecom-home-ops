@@ -171,12 +171,21 @@ func (c *Client) sendMessage(ctx context.Context, payload map[string]interface{}
 	}
 	cardType := ""
 	taskID := ""
-	if cardBody, ok := payload["template_card"].(map[string]interface{}); ok {
-		if v, ok := cardBody["card_type"].(string); ok {
-			cardType = v
+	if rawCard, ok := payload["template_card"]; ok {
+		var cardBody map[string]interface{}
+		switch v := rawCard.(type) {
+		case map[string]interface{}:
+			cardBody = v
+		case TemplateCard:
+			cardBody = map[string]interface{}(v)
 		}
-		if v, ok := cardBody["task_id"].(string); ok {
-			taskID = v
+		if cardBody != nil {
+			if v, ok := cardBody["card_type"].(string); ok {
+				cardType = v
+			}
+			if v, ok := cardBody["task_id"].(string); ok {
+				taskID = v
+			}
 		}
 	}
 

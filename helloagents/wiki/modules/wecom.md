@@ -56,3 +56,4 @@
 - 2026-01-13: 模板卡片按钮回调消费 ResponseCode，调用 update_template_card 更新按钮为不可点击状态
 - 2026-01-13: 修复 PKCS7 padding blockSize 与官方一致（32），解决回调解密 invalid pkcs7 padding
 - 2026-01-13: 新增应用自定义菜单同步（menu/create）与 CLICK 事件支持；补充帮助与斜杠命令
+- 2026-01-13: 模板卡片补齐 source 字段，提升客户端兼容性（避免发送成功但不展示）

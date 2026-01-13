@@ -116,6 +116,22 @@ type TemplateCardMessage struct {
 
 type TemplateCard map[string]interface{}
 
+const defaultCardSourceDesc = "wecom-home-ops"
+
+func applyDefaultSource(card TemplateCard) TemplateCard {
+	if card == nil {
+		card = TemplateCard{}
+	}
+	if _, ok := card["source"]; ok {
+		return card
+	}
+	card["source"] = map[string]interface{}{
+		"desc":       defaultCardSourceDesc,
+		"desc_color": 1,
+	}
+	return card
+}
+
 type ServiceOption struct {
 	Key  string
 	Name string
@@ -134,7 +150,7 @@ func NewServiceSelectCard(services []ServiceOption) TemplateCard {
 		})
 	}
 
-	return TemplateCard{
+	card := TemplateCard{
 		"card_type": "button_interaction",
 		"main_title": map[string]interface{}{
 			"title": "操作菜单",
@@ -142,10 +158,11 @@ func NewServiceSelectCard(services []ServiceOption) TemplateCard {
 		},
 		"button_list": buttons,
 	}
+	return applyDefaultSource(card)
 }
 
 func NewUnraidEntryCard() TemplateCard {
-	return TemplateCard{
+	card := TemplateCard{
 		"card_type": "button_interaction",
 		"main_title": map[string]interface{}{
 			"title": "Unraid 容器",
@@ -164,10 +181,11 @@ func NewUnraidEntryCard() TemplateCard {
 			},
 		},
 	}
+	return applyDefaultSource(card)
 }
 
 func NewUnraidOpsCard() TemplateCard {
-	return TemplateCard{
+	card := TemplateCard{
 		"card_type": "button_interaction",
 		"main_title": map[string]interface{}{
 			"title": "Unraid 容器操作",
@@ -196,13 +214,14 @@ func NewUnraidOpsCard() TemplateCard {
 			},
 		},
 	}
+	return applyDefaultSource(card)
 }
 
 // NewUnraidActionCard 兼容旧命名：等价于 NewUnraidOpsCard。
 func NewUnraidActionCard() TemplateCard { return NewUnraidOpsCard() }
 
 func NewUnraidViewCard() TemplateCard {
-	return TemplateCard{
+	card := TemplateCard{
 		"card_type": "button_interaction",
 		"main_title": map[string]interface{}{
 			"title": "Unraid 容器查看",
@@ -236,6 +255,7 @@ func NewUnraidViewCard() TemplateCard {
 			},
 		},
 	}
+	return applyDefaultSource(card)
 }
 
 type QinglongInstanceOption struct {
@@ -256,7 +276,7 @@ func NewQinglongInstanceSelectCard(instances []QinglongInstanceOption) TemplateC
 		})
 	}
 
-	return TemplateCard{
+	card := TemplateCard{
 		"card_type": "button_interaction",
 		"main_title": map[string]interface{}{
 			"title": "青龙(QL)",
@@ -264,6 +284,7 @@ func NewQinglongInstanceSelectCard(instances []QinglongInstanceOption) TemplateC
 		},
 		"button_list": buttons,
 	}
+	return applyDefaultSource(card)
 }
 
 func NewQinglongActionCard(instanceName string) TemplateCard {
@@ -271,7 +292,7 @@ func NewQinglongActionCard(instanceName string) TemplateCard {
 	if instanceName != "" {
 		desc = "实例：" + instanceName
 	}
-	return TemplateCard{
+	card := TemplateCard{
 		"card_type": "button_interaction",
 		"main_title": map[string]interface{}{
 			"title": "青龙(QL) 任务管理",
@@ -300,6 +321,7 @@ func NewQinglongActionCard(instanceName string) TemplateCard {
 			},
 		},
 	}
+	return applyDefaultSource(card)
 }
 
 type QinglongCronOption struct {
@@ -334,7 +356,7 @@ func NewQinglongCronListCard(title, instanceName string, crons []QinglongCronOpt
 		"key":   EventKeyQinglongMenu,
 	})
 
-	return TemplateCard{
+	card := TemplateCard{
 		"card_type": "button_interaction",
 		"main_title": map[string]interface{}{
 			"title": title,
@@ -342,6 +364,7 @@ func NewQinglongCronListCard(title, instanceName string, crons []QinglongCronOpt
 		},
 		"button_list": buttons,
 	}
+	return applyDefaultSource(card)
 }
 
 func NewQinglongCronActionCard(instanceName string, cronID int, cronName string) TemplateCard {
@@ -358,7 +381,7 @@ func NewQinglongCronActionCard(instanceName string, cronID int, cronName string)
 		title = "任务操作 - ID " + intToString(cronID)
 	}
 
-	return TemplateCard{
+	card := TemplateCard{
 		"card_type": "button_interaction",
 		"main_title": map[string]interface{}{
 			"title": title,
@@ -392,10 +415,11 @@ func NewQinglongCronActionCard(instanceName string, cronID int, cronName string)
 			},
 		},
 	}
+	return applyDefaultSource(card)
 }
 
 func NewConfirmCard(actionDisplayName, target string) TemplateCard {
-	return TemplateCard{
+	card := TemplateCard{
 		"card_type": "button_interaction",
 		"main_title": map[string]interface{}{
 			"title": "确认执行",
@@ -414,6 +438,7 @@ func NewConfirmCard(actionDisplayName, target string) TemplateCard {
 			},
 		},
 	}
+	return applyDefaultSource(card)
 }
 
 func intToString(v int) string {

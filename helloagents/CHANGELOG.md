@@ -24,6 +24,7 @@
 - wecom/qinglong：token 刷新引入 singleflight，避免并发刷新击穿与上游限流风险
 - core：StateStore 增加后台定时清理，避免过期状态长期驻留
 - wecom：回调增加请求体上限与短期去重，吸收重试并避免重复执行业务逻辑
+- wecom：模板卡片补齐 `source` 字段，修复部分客户端“发送成功但不展示”的问题
 - wecom：增强发送消息/gettoken/update_template_card 的结构化日志；message/send 返回 invaliduser 等不可达信息时输出告警并返回错误
 - app/wecom：回调与请求日志增强（GET/POST 回调增加验签/解密/解析阶段日志；请求日志增加 status_code/response_bytes）
 - config：配置加载日志增强（输出 config 文件 path/sha256/size/mtime；打印脱敏配置摘要用于确认容器挂载是否生效）
