@@ -25,7 +25,7 @@ auth:
 unraid:
   endpoint: "http://unraid-host:port/graphql"
   api_key: "your-unraid-api-key"
-  origin: "daily-help"
+  origin: "wecom-home-ops"
   # 容器查看：日志
   logs_field: "logs"
   # 默认使用 logs(tail: N)；如上游不支持 tail 参数，可设为空字符串禁用（仍会在本地截取最新 N 行）

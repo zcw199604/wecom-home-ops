@@ -16,7 +16,7 @@
 
 ## 3. 错误处理改进
 - [√] 3.1 在 `internal/wecom/callback.go` 中处理 `HandleMessage` 返回 error：返回 5xx 触发重试
-- [√] 3.2 在 `cmd/daily-help/main.go` 中移除 `panic`，改为日志输出 + 退出码
+- [√] 3.2 在 `cmd/wecom-home-ops/main.go` 中移除 `panic`，改为日志输出 + 退出码
 
 ## 4. 安全检查
 - [√] 4.1 安全检查：配置字段校验、避免敏感信息输出、避免重复执行风险

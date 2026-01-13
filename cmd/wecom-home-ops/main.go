@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	"daily-help/internal/app"
-	"daily-help/internal/config"
+	"github.com/zcw199604/wecom-home-ops/internal/app"
+	"github.com/zcw199604/wecom-home-ops/internal/config"
 )
 
 func main() {

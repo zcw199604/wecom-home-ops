@@ -5,7 +5,7 @@
 ---
 
 ## 1. 容器化
-- [√] 1.1 新增 `Dockerfile`（多阶段构建 + 最小运行镜像），确保可构建 `daily-help` 二进制
+- [√] 1.1 新增 `Dockerfile`（多阶段构建 + 最小运行镜像），确保可构建 `wecom-home-ops` 二进制
 - [√] 1.2 新增 `.dockerignore` 减少构建上下文体积
 
 ## 2. CI/CD

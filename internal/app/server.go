@@ -9,11 +9,11 @@ import (
 	"net/http"
 	"time"
 
-	"daily-help/internal/config"
-	"daily-help/internal/core"
-	"daily-help/internal/qinglong"
-	"daily-help/internal/unraid"
-	"daily-help/internal/wecom"
+	"github.com/zcw199604/wecom-home-ops/internal/config"
+	"github.com/zcw199604/wecom-home-ops/internal/core"
+	"github.com/zcw199604/wecom-home-ops/internal/qinglong"
+	"github.com/zcw199604/wecom-home-ops/internal/unraid"
+	"github.com/zcw199604/wecom-home-ops/internal/wecom"
 )
 
 type Server struct {

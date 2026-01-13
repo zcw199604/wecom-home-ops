@@ -11,8 +11,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"daily-help/internal/core"
-	"daily-help/internal/wecom"
+	"github.com/zcw199604/wecom-home-ops/internal/core"
+	"github.com/zcw199604/wecom-home-ops/internal/wecom"
 )
 
 type ProviderDeps struct {

@@ -23,7 +23,7 @@
 ### 3) 回调与启动错误处理
 - `internal/wecom/callback.go`：
   - 如果 `HandleMessage` 返回 error，HTTP 返回 500（触发企业微信重试）
-- `cmd/daily-help/main.go`：
+- `cmd/wecom-home-ops/main.go`：
   - 配置加载失败：输出错误并 `os.Exit(1)`，不 panic
 
 ## 安全与性能

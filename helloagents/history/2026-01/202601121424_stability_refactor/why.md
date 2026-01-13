@@ -16,7 +16,7 @@
 
 ## 影响范围
 - **模块:** unraid / core / wecom / app / config
-- **文件:** `internal/unraid/client.go`、`internal/config/config.go`、`internal/app/server.go`、`internal/wecom/callback.go`、`cmd/daily-help/main.go` 等
+- **文件:** `internal/unraid/client.go`、`internal/config/config.go`、`internal/app/server.go`、`internal/wecom/callback.go`、`cmd/wecom-home-ops/main.go` 等
 - **配置:** `config.example.yaml` 需同步新增字段
 - **行为变化:** Unraid stats/logs/force update 的默认字段名固定；如上游 Schema 不一致需显式配置覆盖
 

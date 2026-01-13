@@ -13,15 +13,15 @@ RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
 
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /out/daily-help ./cmd/daily-help
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /out/wecom-home-ops ./cmd/wecom-home-ops
 
 FROM gcr.io/distroless/static:nonroot
 
-COPY --from=build /out/daily-help /daily-help
+COPY --from=build /out/wecom-home-ops /wecom-home-ops
 
 EXPOSE 8080
 
 USER nonroot:nonroot
 
-ENTRYPOINT ["/daily-help"]
+ENTRYPOINT ["/wecom-home-ops"]
 CMD ["-config", "/config/config.yaml"]

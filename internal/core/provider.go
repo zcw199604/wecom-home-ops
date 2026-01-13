@@ -4,7 +4,7 @@ package core
 import (
 	"context"
 
-	"daily-help/internal/wecom"
+	"github.com/zcw199604/wecom-home-ops/internal/wecom"
 )
 
 // WeComSender 抽象企业微信消息发送能力，便于在 core 与各 Provider 中复用与测试替身注入。

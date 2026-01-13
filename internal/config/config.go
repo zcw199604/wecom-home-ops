@@ -168,7 +168,7 @@ func applyDefaults(cfg *Config) {
 		cfg.WeCom.APIBaseURL = "https://qyapi.weixin.qq.com/cgi-bin"
 	}
 	if cfg.Unraid.Origin == "" {
-		cfg.Unraid.Origin = "daily-help"
+		cfg.Unraid.Origin = "wecom-home-ops"
 	}
 	if cfg.Unraid.LogsField == "" {
 		cfg.Unraid.LogsField = "logs"

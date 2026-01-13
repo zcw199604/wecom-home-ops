@@ -16,6 +16,7 @@
 | 202601121424 | stability_refactor | 重构 | ✅已完成 | [202601121424_stability_refactor](2026-01/202601121424_stability_refactor/) |
 | 202601121524 | wecom_callback_guard | 修复 | ✅已完成 | [202601121524_wecom_callback_guard](2026-01/202601121524_wecom_callback_guard/) |
 | 202601121538 | test_suite | 测试 | ✅已完成 | [202601121538_test_suite](2026-01/202601121538_test_suite/) |
+| 202601130553 | rename_wecom_home_ops | 重构 | ✅已完成 | [202601130553_rename_wecom_home_ops](2026-01/202601130553_rename_wecom_home_ops/) |
 
 ---
 
@@ -31,3 +32,4 @@
 - [202601121424_stability_refactor](2026-01/202601121424_stability_refactor/) - Unraid 去 introspection + 配置化超时 + 回调错误处理
 - [202601121524_wecom_callback_guard](2026-01/202601121524_wecom_callback_guard/) - 回调保护：请求体上限 + 短期去重（吸收重试）
 - [202601121538_test_suite](2026-01/202601121538_test_suite/) - 全功能测试用例补齐 + Claude 复审
+- [202601130553_rename_wecom_home_ops](2026-01/202601130553_rename_wecom_home_ops/) - 项目更名为 wecom-home-ops（module/二进制/Docker/文档对齐）

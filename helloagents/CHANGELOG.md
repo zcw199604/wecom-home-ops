@@ -23,6 +23,7 @@
 - main：配置加载失败不再 panic，改为日志输出并退出
 
 ### 变更
+- 项目：整体更名为 wecom-home-ops（Go module/import、入口二进制、Dockerfile、示例命令与文档）
 - unraid：移除 GraphQL introspection 探测逻辑，改为固定字段 + 配置覆盖（logs/stats/force update）
 
 ## [0.1.0] - 2026-01-12

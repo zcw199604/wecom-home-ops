@@ -27,4 +27,4 @@
   - `DOCKERHUB_USERNAME`: Docker Hub 用户名
   - `DOCKERHUB_TOKEN`: Docker Hub Access Token（建议使用 Token 而非密码）
 - **可选 Secrets:**
-  - `DOCKERHUB_REPOSITORY`: 完整镜像名（如 `yourname/daily-help`）；未设置时默认 `DOCKERHUB_USERNAME/<GitHub仓库名>`
+  - `DOCKERHUB_REPOSITORY`: 完整镜像名（如 `yourname/wecom-home-ops`）；未设置时默认 `DOCKERHUB_USERNAME/<GitHub仓库名>`

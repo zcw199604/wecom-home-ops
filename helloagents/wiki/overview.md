@@ -1,4 +1,4 @@
-# daily-help
+# wecom-home-ops
 
 > 企业微信自建应用回调 + 家庭本地服务统一中间层（MVP: Unraid 容器管理）
 

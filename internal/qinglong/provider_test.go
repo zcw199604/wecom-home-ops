@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"daily-help/internal/core"
-	"daily-help/internal/wecom"
+	"github.com/zcw199604/wecom-home-ops/internal/core"
+	"github.com/zcw199604/wecom-home-ops/internal/wecom"
 )
 
 type recordWeCom struct {

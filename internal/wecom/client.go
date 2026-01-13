@@ -54,7 +54,7 @@ func (c *Client) SendText(ctx context.Context, msg TextMessage) error {
 
 func (c *Client) SendTemplateCard(ctx context.Context, msg TemplateCardMessage) error {
 	if _, ok := msg.Card["task_id"]; !ok {
-		msg.Card["task_id"] = "daily-help-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+		msg.Card["task_id"] = "wecom-home-ops-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	}
 	payload := map[string]interface{}{
 		"touser":        msg.ToUser,

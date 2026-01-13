@@ -1,4 +1,4 @@
-module daily-help
+module github.com/zcw199604/wecom-home-ops
 
 go 1.22
 

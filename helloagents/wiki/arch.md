@@ -5,7 +5,7 @@
 ```mermaid
 flowchart TD
     U[用户（企业微信应用会话）] -->|消息/事件回调| W[企业微信服务端]
-    W -->|回调URL| S[daily-help 服务]
+    W -->|回调URL| S[wecom-home-ops 服务]
     S --> R[core.Router]
     R --> PU[Provider: Unraid]
     R --> PQ[Provider: 青龙(QL)]
@@ -28,7 +28,7 @@ flowchart TD
 sequenceDiagram
     participant User as 用户
     participant WeCom as 企业微信
-    participant Svc as daily-help
+    participant Svc as wecom-home-ops
     participant Backend as 后端服务
 
     User->>WeCom: 发送“菜单”/服务关键词

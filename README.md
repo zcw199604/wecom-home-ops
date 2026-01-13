@@ -1,4 +1,4 @@
-# daily-help
+# wecom-home-ops
 
 企业微信自建应用回调 + 家庭本地服务统一中间层（MVP: Unraid/青龙）。
 
@@ -11,18 +11,18 @@
 1. 复制配置并填写：
    - `cp config.example.yaml config.yaml`
 2. 启动服务：
-   - `go run ./cmd/daily-help -config config.yaml`
+   - `go run ./cmd/wecom-home-ops -config config.yaml`
 3. 在企业微信自建应用中配置“接收消息服务器”：
    - 回调 URL：`https://<你的域名>/wecom/callback`
    - Token / EncodingAESKey：与 `config.yaml` 对应
 
 ## 使用 Docker 启动
 1. 构建镜像：
-   - `docker build -t daily-help:local .`
+   - `docker build -t wecom-home-ops:local .`
 2. 启动容器（默认读取 `/config/config.yaml`）：
-   - `docker run -d --name daily-help --restart unless-stopped -p 8080:8080 -v "$(pwd)/config.yaml:/config/config.yaml:ro" daily-help:local`
+   - `docker run -d --name wecom-home-ops --restart unless-stopped -p 8080:8080 -v "$(pwd)/config.yaml:/config/config.yaml:ro" wecom-home-ops:local`
 3. 查看日志：
-   - `docker logs -f daily-help`
+   - `docker logs -f wecom-home-ops`
 
 > 注意：容器默认以 nonroot 运行，请确保 `config.yaml` 对其他用户可读（如 `chmod 644 config.yaml`）。如修改 `server.listen_addr` 端口，请同步调整 `-p` 映射。
 

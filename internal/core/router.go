@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"daily-help/internal/wecom"
+	"github.com/zcw199604/wecom-home-ops/internal/wecom"
 )
 
 type RouterDeps struct {
