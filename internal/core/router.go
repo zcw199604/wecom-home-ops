@@ -81,6 +81,15 @@ func (r *Router) HandleMessage(ctx context.Context, msg wecom.IncomingMessage) e
 		return nil
 	}
 
+	if msg.MsgType == "text" {
+		if isSelfTestKeyword(normalizeKeyword(msg.Content)) {
+			return r.WeCom.SendText(ctx, wecom.TextMessage{
+				ToUser:  userID,
+				Content: buildSelfTestReply(msg),
+			})
+		}
+	}
+
 	switch msg.MsgType {
 	case "text":
 		return r.handleText(ctx, userID, strings.TrimSpace(msg.Content))
@@ -278,4 +287,37 @@ func isMenuKeyword(normalized string) bool {
 	default:
 		return false
 	}
+}
+
+func isSelfTestKeyword(normalized string) bool {
+	switch normalized {
+	case "ping", "/ping", "自检":
+		return true
+	default:
+		return false
+	}
+}
+
+func buildSelfTestReply(msg wecom.IncomingMessage) string {
+	var b strings.Builder
+	b.WriteString("pong")
+	b.WriteString("\nserver_time: ")
+	b.WriteString(time.Now().Format(time.RFC3339))
+	if v := strings.TrimSpace(msg.ToUserName); v != "" {
+		b.WriteString("\nto: ")
+		b.WriteString(v)
+	}
+	if v := strings.TrimSpace(msg.FromUserName); v != "" {
+		b.WriteString("\nfrom: ")
+		b.WriteString(v)
+	}
+	if v := strings.TrimSpace(msg.MsgType); v != "" {
+		b.WriteString("\nmsg_type: ")
+		b.WriteString(v)
+	}
+	if v := strings.TrimSpace(msg.MsgID); v != "" {
+		b.WriteString("\nmsg_id: ")
+		b.WriteString(v)
+	}
+	return b.String()
 }

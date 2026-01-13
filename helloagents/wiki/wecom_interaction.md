@@ -255,6 +255,11 @@ POST https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=ACCESS_TOKEN
   - `MsgType=event`：处理 `enter_agent` 与 `template_card_event`（按钮回调）
 - 状态：`internal/core/state.go`（step/action/参数/TTL）
 
+### 收发自检（自动回复）
+
+- 白名单用户发送 `ping` 或 `自检`，服务会回复 `pong` 并附带 `server_time/msg_id` 等诊断字段，用于快速验证“回调接收 + 发消息 API”链路是否正常。
+- 代码位置：`internal/core/router.go`
+
 ### 模板卡片构建与事件 key 约定
 
 - 卡片结构与按钮 key：`internal/wecom/message.go`
