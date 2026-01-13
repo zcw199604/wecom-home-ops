@@ -106,6 +106,9 @@ type ConversationState struct {
 	ContainerName string
 	CronID        int
 
+	// PendingButtons 用于模板卡片(button_interaction)的文本兜底：当用户回复“序号”时，映射到对应的 EventKey。
+	PendingButtons []wecom.TemplateCardButton
+
 	ExpiresAt time.Time
 }
 

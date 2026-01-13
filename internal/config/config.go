@@ -91,6 +91,15 @@ type WeComConfig struct {
 	Token          string `yaml:"token"`
 	EncodingAESKey string `yaml:"encoding_aes_key"`
 	APIBaseURL     string `yaml:"api_base_url"`
+	// TemplateCardMode 控制模板卡片(template_card)的发送与文本兜底策略：
+	// - template_card：仅发送模板卡片（默认）
+	// - both：发送模板卡片 + 发送文本菜单兜底（并支持“回复序号”触发同等 EventKey）
+	// - text：仅发送文本菜单兜底（并支持“回复序号”触发同等 EventKey）
+	//
+	// 官方限制（SSOT：https://developer.work.weixin.qq.com/document/path/90236）：
+	// - 文本通知/图文展示/按钮交互型：企业微信 3.1.6+ 支持
+	// - 微工作台（原企业号）不支持展示模板卡片消息
+	TemplateCardMode string `yaml:"template_card_mode"`
 }
 
 type UnraidConfig struct {
@@ -180,6 +189,7 @@ func Load(path string) (Config, error) {
 		"wecom.corpid", maskSensitive(cfg.WeCom.CorpID),
 		"wecom.agentid", cfg.WeCom.AgentID,
 		"wecom.api_base_url", cfg.WeCom.APIBaseURL,
+		"wecom.template_card_mode", cfg.WeCom.TemplateCardMode,
 		"wecom.token_len", len(cfg.WeCom.Token),
 		"wecom.encoding_aes_key_len", len(cfg.WeCom.EncodingAESKey),
 		"wecom.secret_len", len(cfg.WeCom.Secret),
@@ -212,6 +222,9 @@ func applyDefaults(cfg *Config) {
 	}
 	if cfg.WeCom.APIBaseURL == "" {
 		cfg.WeCom.APIBaseURL = "https://qyapi.weixin.qq.com/cgi-bin"
+	}
+	if strings.TrimSpace(cfg.WeCom.TemplateCardMode) == "" {
+		cfg.WeCom.TemplateCardMode = "template_card"
 	}
 	if cfg.Unraid.Origin == "" {
 		cfg.Unraid.Origin = "wecom-home-ops"
@@ -276,6 +289,11 @@ func validate(cfg Config) error {
 	}
 	if cfg.WeCom.APIBaseURL == "" {
 		problems = append(problems, "wecom.api_base_url 不能为空")
+	}
+	switch strings.ToLower(strings.TrimSpace(cfg.WeCom.TemplateCardMode)) {
+	case "template_card", "both", "text":
+	default:
+		problems = append(problems, "wecom.template_card_mode 不合法（仅支持 template_card/both/text）")
 	}
 
 	hasUnraid := strings.TrimSpace(cfg.Unraid.Endpoint) != "" || strings.TrimSpace(cfg.Unraid.APIKey) != ""

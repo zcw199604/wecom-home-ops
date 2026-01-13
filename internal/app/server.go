@@ -37,6 +37,11 @@ func NewServer(cfg config.Config) (*Server, error) {
 	}, httpClient)
 
 	stateStore := core.NewStateStore(cfg.Core.StateTTL.ToDuration())
+	wecomSender := core.NewTemplateCardSender(core.TemplateCardSenderDeps{
+		Base:  wecomClient,
+		State: stateStore,
+		Mode:  core.TemplateCardMode(cfg.WeCom.TemplateCardMode),
+	})
 	deduper := wecom.NewDeduper(10 * time.Minute)
 
 	var providers []core.ServiceProvider
@@ -60,7 +65,7 @@ func NewServer(cfg config.Config) (*Server, error) {
 			ForceUpdateReturnFields: cfg.Unraid.ForceUpdateReturnFields,
 		}, httpClient)
 		providers = append(providers, unraid.NewProvider(unraid.ProviderDeps{
-			WeCom:  wecomClient,
+			WeCom:  wecomSender,
 			Client: unraidClient,
 			State:  stateStore,
 		}))
@@ -84,14 +89,14 @@ func NewServer(cfg config.Config) (*Server, error) {
 			})
 		}
 		providers = append(providers, qinglong.NewProvider(qinglong.ProviderDeps{
-			WeCom:     wecomClient,
+			WeCom:     wecomSender,
 			State:     stateStore,
 			Instances: instances,
 		}))
 	}
 
 	router := core.NewRouter(core.RouterDeps{
-		WeCom:         wecomClient,
+		WeCom:         wecomSender,
 		AllowedUserID: make(map[string]struct{}),
 		Providers:     providers,
 		State:         stateStore,

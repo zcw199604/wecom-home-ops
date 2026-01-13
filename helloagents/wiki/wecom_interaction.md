@@ -203,6 +203,23 @@ POST https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=ACCESS_TOKEN
   - `button_list.key`：当 `type=0` 时必填，回调事件会将其作为 `EventKey` 返回（最长 1024 字节）
   - `button_list.style`：1~4，不填默认 1
 
+#### 展示兼容性（重要）
+
+官方备注（同上链接）：
+
+- 投票选择型、多项选择型：仅企业微信 3.1.12 及以上版本支持
+- 文本通知型、图文展示型、按钮交互型：仅企业微信 3.1.6 及以上版本支持（但附件下载功能仍需更新至 3.1.12）
+- 微工作台（原企业号）不支持展示模板卡片消息
+
+因此如果出现 **API 返回 ok，但客户端“无反应/不展示模板卡片”**，优先确认：
+
+- 企业微信客户端版本是否满足上述要求（移动端/PC 端）
+- 是否处于微工作台环境
+
+本项目提供文本兜底：
+
+- 在 `config.yaml` 中设置 `wecom.template_card_mode: both`（卡片 + 文本）或 `text`（仅文本）后，发送模板卡片时会额外发送“文本菜单”，并支持 **回复序号** 触发同等 `EventKey`（避免卡片不展示导致交互中断）。
+
 最小可用 JSON 示例（回调型按钮）：
 
 ```json
@@ -258,6 +275,7 @@ curl -sS -X POST 'https://qyapi.weixin.qq.com/cgi-bin/message/update_template_ca
 - `wecom.corpid` / `wecom.agentid` / `wecom.secret`
 - `wecom.token` / `wecom.encoding_aes_key`
 - `wecom.api_base_url`（默认 `https://qyapi.weixin.qq.com/cgi-bin`）
+- `wecom.template_card_mode`（`template_card`/`both`/`text`）
 
 回调/发消息字段与配置的对应关系（便于核对企业微信后台配置）：
 
@@ -325,3 +343,6 @@ curl -sS -X POST 'https://qyapi.weixin.qq.com/cgi-bin/message/update_template_ca
    - 确认回调事件为 `template_card_event` 且能在回调明文中看到 `EventKey/TaskId`
 5. 发送消息报错（errcode/errmsg）
    - 检查 `agentid`、`secret`、接收者 `touser` 是否正确，以及 `access_token` 是否过期
+6. 发送模板卡片成功但客户端不展示
+   - 核对企业微信客户端版本门槛（官方说明：按钮交互型至少 3.1.6；投票/多选至少 3.1.12；微工作台不支持）
+   - 可临时改用文本兜底：`wecom.template_card_mode: both|text`

@@ -1,6 +1,11 @@
 // Package wecom 封装企业微信自建应用的消息收发与交互卡片构建。
 package wecom
 
+import (
+	"fmt"
+	"strings"
+)
+
 // message.go 定义企业微信回调消息结构与交互卡片构造。
 type IncomingMessage struct {
 	ToUserName   string `xml:"ToUserName"`
@@ -116,6 +121,12 @@ type TemplateCardMessage struct {
 
 type TemplateCard map[string]interface{}
 
+// TemplateCardButton 用于“button_interaction”卡片的按钮信息抽取（供文本兜底与序号选择映射使用）。
+type TemplateCardButton struct {
+	Text string
+	Key  string
+}
+
 const defaultCardSourceDesc = "wecom-home-ops"
 
 func applyDefaultSource(card TemplateCard) TemplateCard {
@@ -130,6 +141,123 @@ func applyDefaultSource(card TemplateCard) TemplateCard {
 		"desc_color": 1,
 	}
 	return card
+}
+
+// RenderButtonInteractionTextMenu 将 button_interaction 卡片渲染为“文本菜单”兜底，并返回按钮映射。
+// 返回 ok=false 表示当前卡片不是 button_interaction 或无法抽取有效按钮。
+func RenderButtonInteractionTextMenu(card TemplateCard) (text string, buttons []TemplateCardButton, ok bool) {
+	if card == nil {
+		return "", nil, false
+	}
+	cardType, _ := card["card_type"].(string)
+	if strings.ToLower(strings.TrimSpace(cardType)) != "button_interaction" {
+		return "", nil, false
+	}
+
+	title, desc := extractMainTitle(card)
+	buttons = extractButtonList(card)
+	if len(buttons) == 0 {
+		return "", nil, false
+	}
+
+	var b strings.Builder
+	if strings.TrimSpace(title) != "" {
+		b.WriteString(strings.TrimSpace(title))
+	}
+	if strings.TrimSpace(desc) != "" {
+		if b.Len() > 0 {
+			b.WriteString("\n")
+		}
+		b.WriteString(strings.TrimSpace(desc))
+	}
+	if b.Len() > 0 {
+		b.WriteString("\n\n")
+	}
+	for i, btn := range buttons {
+		lineText := strings.TrimSpace(btn.Text)
+		if lineText == "" {
+			lineText = "按钮"
+		}
+		b.WriteString(fmt.Sprintf("%d. %s\n", i+1, lineText))
+	}
+	b.WriteString("\n回复序号选择。")
+
+	return b.String(), buttons, true
+}
+
+func extractMainTitle(card TemplateCard) (title, desc string) {
+	raw, ok := card["main_title"]
+	if !ok || raw == nil {
+		return "", ""
+	}
+	var m map[string]interface{}
+	switch v := raw.(type) {
+	case map[string]interface{}:
+		m = v
+	case TemplateCard:
+		m = map[string]interface{}(v)
+	default:
+		return "", ""
+	}
+	if m == nil {
+		return "", ""
+	}
+	if v, ok := m["title"].(string); ok {
+		title = v
+	}
+	if v, ok := m["desc"].(string); ok {
+		desc = v
+	}
+	if strings.TrimSpace(title) == "" {
+		if v, ok := card["sub_title_text"].(string); ok {
+			title = v
+		}
+	}
+	return title, desc
+}
+
+func extractButtonList(card TemplateCard) []TemplateCardButton {
+	raw, ok := card["button_list"]
+	if !ok || raw == nil {
+		return nil
+	}
+
+	var items []map[string]interface{}
+	switch v := raw.(type) {
+	case []map[string]interface{}:
+		items = v
+	case []interface{}:
+		for _, item := range v {
+			if item == nil {
+				continue
+			}
+			if m, ok := item.(map[string]interface{}); ok {
+				items = append(items, m)
+			}
+		}
+	}
+	if len(items) == 0 {
+		return nil
+	}
+
+	var buttons []TemplateCardButton
+	for _, m := range items {
+		if m == nil {
+			continue
+		}
+		text, _ := m["text"].(string)
+		key, _ := m["key"].(string)
+		text = strings.TrimSpace(text)
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		buttons = append(buttons, TemplateCardButton{
+			Text: text,
+			Key:  key,
+		})
+	}
+	return buttons
 }
 
 type ServiceOption struct {

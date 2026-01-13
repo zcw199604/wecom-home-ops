@@ -130,6 +130,9 @@ func TestApplyDefaults(t *testing.T) {
 	if cfg.WeCom.APIBaseURL != "https://qyapi.weixin.qq.com/cgi-bin" {
 		t.Fatalf("WeCom.APIBaseURL = %q, want default", cfg.WeCom.APIBaseURL)
 	}
+	if cfg.WeCom.TemplateCardMode != "template_card" {
+		t.Fatalf("WeCom.TemplateCardMode = %q, want %q", cfg.WeCom.TemplateCardMode, "template_card")
+	}
 	if cfg.Unraid.Origin != "wecom-home-ops" {
 		t.Fatalf("Unraid.Origin = %q, want %q", cfg.Unraid.Origin, "wecom-home-ops")
 	}

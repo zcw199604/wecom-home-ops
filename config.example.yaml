@@ -17,6 +17,15 @@ wecom:
   token: "填写回调Token"
   encoding_aes_key: "填写EncodingAESKey"
   api_base_url: "https://qyapi.weixin.qq.com/cgi-bin"
+  # 模板卡片(template_card)发送模式：template_card | both | text
+  # - template_card：仅发送模板卡片（默认）
+  # - both：模板卡片 + 文本兜底（并支持“回复序号”触发同等 EventKey）
+  # - text：仅发送文本兜底（适用于客户端不支持模板卡片的情况）
+  #
+  # 官方说明（SSOT：https://developer.work.weixin.qq.com/document/path/90236）：
+  # - 文本通知/图文展示/按钮交互型：企业微信 3.1.6+ 支持
+  # - 微工作台（原企业号）不支持展示模板卡片消息
+  template_card_mode: "template_card"
 
 auth:
   allowed_userids:

@@ -161,6 +161,87 @@ func TestRouter_ClickCoreMenu_SendsServiceSelectCard(t *testing.T) {
 	}
 }
 
+func TestRouter_PendingButtons_Number_TriggersEventKey(t *testing.T) {
+	t.Parallel()
+
+	rec := &recordWeCom{}
+	userID := "u"
+
+	unraid := &fakeProvider{key: "unraid", name: "Unraid 容器", eventHandled: true}
+	state := NewStateStore(1 * time.Minute)
+
+	r := NewRouter(RouterDeps{
+		WeCom: rec,
+		AllowedUserID: map[string]struct{}{
+			userID: {},
+		},
+		Providers: []ServiceProvider{
+			unraid,
+		},
+		State: state,
+	})
+
+	state.Set(userID, ConversationState{
+		PendingButtons: []wecom.TemplateCardButton{
+			{Text: "容器查看", Key: wecom.EventKeyUnraidMenuView},
+		},
+	})
+
+	if err := r.HandleMessage(context.Background(), wecom.IncomingMessage{
+		FromUserName: userID,
+		MsgType:      "text",
+		Content:      "1",
+	}); err != nil {
+		t.Fatalf("HandleMessage() error: %v", err)
+	}
+
+	if unraid.onEvent != 1 {
+		t.Fatalf("unraid HandleEvent hits = %d, want 1", unraid.onEvent)
+	}
+}
+
+func TestRouter_PendingButtons_Number_TriggersConfirm(t *testing.T) {
+	t.Parallel()
+
+	rec := &recordWeCom{}
+	userID := "u"
+
+	unraid := &fakeProvider{key: "unraid", name: "Unraid 容器", confirmHandled: true}
+	state := NewStateStore(1 * time.Minute)
+
+	r := NewRouter(RouterDeps{
+		WeCom: rec,
+		AllowedUserID: map[string]struct{}{
+			userID: {},
+		},
+		Providers: []ServiceProvider{
+			unraid,
+		},
+		State: state,
+	})
+
+	state.Set(userID, ConversationState{
+		ServiceKey: "unraid",
+		Step:       StepAwaitingConfirm,
+		PendingButtons: []wecom.TemplateCardButton{
+			{Text: "确认", Key: wecom.EventKeyConfirm},
+			{Text: "取消", Key: wecom.EventKeyCancel},
+		},
+	})
+
+	if err := r.HandleMessage(context.Background(), wecom.IncomingMessage{
+		FromUserName: userID,
+		MsgType:      "text",
+		Content:      "1",
+	}); err != nil {
+		t.Fatalf("HandleMessage() error: %v", err)
+	}
+
+	if unraid.onConfirm != 1 {
+		t.Fatalf("unraid HandleConfirm hits = %d, want 1", unraid.onConfirm)
+	}
+}
+
 func TestRouter_DirectKeyword_EntersProvider(t *testing.T) {
 	t.Parallel()
 

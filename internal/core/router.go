@@ -6,6 +6,7 @@ import (
 	"context"
 	"log/slog"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -121,6 +122,25 @@ func (r *Router) HandleMessage(ctx context.Context, msg wecom.IncomingMessage) e
 func (r *Router) handleText(ctx context.Context, userID string, content string) error {
 	if content == "" {
 		return nil
+	}
+
+	if state, ok := r.state.Get(userID); ok && len(state.PendingButtons) > 0 {
+		// 文本兜底：用户回复“序号”触发同等 EventKey（避免模板卡片不展示导致交互中断）。
+		if idx, err := strconv.Atoi(strings.TrimSpace(content)); err == nil {
+			if idx >= 1 && idx <= len(state.PendingButtons) && (state.Step == "" || state.Step == StepAwaitingConfirm) {
+				key := strings.TrimSpace(state.PendingButtons[idx-1].Key)
+				state.PendingButtons = nil
+				r.state.Set(userID, state)
+				if key != "" {
+					return r.handleEvent(ctx, userID, wecom.IncomingMessage{
+						FromUserName: userID,
+						MsgType:      "event",
+						Event:        "click",
+						EventKey:     key,
+					})
+				}
+			}
+		}
 	}
 
 	keyword := normalizeCommandKeyword(content)
