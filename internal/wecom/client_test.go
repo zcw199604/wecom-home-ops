@@ -234,3 +234,89 @@ func TestClient_UpdateTemplateCardButton_RequestShape(t *testing.T) {
 		t.Fatalf("update hits = %d, want 1", updateHits)
 	}
 }
+
+func TestClient_CreateMenu_RequestShape(t *testing.T) {
+	t.Parallel()
+
+	var getTokenHits int32
+	var createHits int32
+	validateErr := make(chan error, 1)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/gettoken":
+			atomic.AddInt32(&getTokenHits, 1)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"errcode":      0,
+				"errmsg":       "ok",
+				"access_token": "AT",
+				"expires_in":   7200,
+			})
+			return
+		case "/menu/create":
+			atomic.AddInt32(&createHits, 1)
+			if got := r.URL.Query().Get("access_token"); got != "AT" {
+				select {
+				case validateErr <- fmt.Errorf("access_token = %q, want %q", got, "AT"):
+				default:
+				}
+			}
+			if got := r.URL.Query().Get("agentid"); got != "1" {
+				select {
+				case validateErr <- fmt.Errorf("agentid = %q, want %q", got, "1"):
+				default:
+				}
+			}
+			var payload map[string]interface{}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				select {
+				case validateErr <- fmt.Errorf("decode payload error: %w", err):
+				default:
+				}
+			} else {
+				buttons, ok := payload["button"].([]interface{})
+				if !ok || len(buttons) == 0 {
+					select {
+					case validateErr <- fmt.Errorf("button missing or empty"):
+					default:
+					}
+				}
+			}
+
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"errcode": 0,
+				"errmsg":  "ok",
+			})
+			return
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	c := NewClient(ClientConfig{
+		APIBaseURL: srv.URL,
+		CorpID:     "ww",
+		AgentID:    1,
+		Secret:     "sec",
+	}, srv.Client())
+
+	if err := c.CreateMenu(context.Background(), DefaultMenu()); err != nil {
+		t.Fatalf("CreateMenu() error: %v", err)
+	}
+	select {
+	case err := <-validateErr:
+		if err != nil {
+			t.Fatalf("validate request error: %v", err)
+		}
+	default:
+	}
+
+	if atomic.LoadInt32(&getTokenHits) != 1 {
+		t.Fatalf("gettoken hits = %d, want 1", getTokenHits)
+	}
+	if atomic.LoadInt32(&createHits) != 1 {
+		t.Fatalf("menu/create hits = %d, want 1", createHits)
+	}
+}

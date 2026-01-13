@@ -31,12 +31,17 @@
 **模块:** wecom
 支持“服务选择/实例选择/任务选择”等交互卡片，配合 core 的 Provider 分发实现多后端服务的统一入口。
 
+### 需求: 应用自定义菜单
+**模块:** wecom
+支持企业微信自建应用“底部菜单”（menu/create），并可消费 `CLICK` 事件，将菜单点击映射到 core 的路由与命令体系。
+
 ## API接口
 对外 HTTP 入口见 `wiki/api.md`。
 
 ## 交互文档
 - [企业微信自建应用会话交互速查](../wecom_interaction.md)
-- 收发自检：白名单用户发送 `ping` 或 `自检`，收到 `pong` 回复即说明收消息与发消息链路正常。
+- 收发自检：白名单用户发送 `ping`/`/ping` 或 `自检`（或点击菜单“自检”），收到 `pong` 回复即说明收消息与发消息链路正常。
+- 帮助：发送 `帮助`/`help` 可查看可用命令；发送 `同步菜单` 可创建/覆盖应用自定义菜单。
 
 ## 数据模型
 无独立持久化数据；读取 Config 并透传到 core。
@@ -50,3 +55,4 @@
 - 2026-01-12: access_token 刷新引入 singleflight，抑制并发刷新击穿
 - 2026-01-13: 模板卡片按钮回调消费 ResponseCode，调用 update_template_card 更新按钮为不可点击状态
 - 2026-01-13: 修复 PKCS7 padding blockSize 与官方一致（32），解决回调解密 invalid pkcs7 padding
+- 2026-01-13: 新增应用自定义菜单同步（menu/create）与 CLICK 事件支持；补充帮助与斜杠命令

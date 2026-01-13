@@ -20,6 +20,11 @@ type recordWeComUpdater struct {
 	updates []templateCardUpdate
 }
 
+type recordWeComMenu struct {
+	recordWeCom
+	menus []wecom.Menu
+}
+
 type templateCardUpdate struct {
 	ResponseCode string
 	ReplaceName  string
@@ -37,6 +42,11 @@ func (r *recordWeCom) SendTemplateCard(_ context.Context, msg wecom.TemplateCard
 
 func (r *recordWeComUpdater) UpdateTemplateCardButton(_ context.Context, responseCode string, replaceName string) error {
 	r.updates = append(r.updates, templateCardUpdate{ResponseCode: responseCode, ReplaceName: replaceName})
+	return nil
+}
+
+func (r *recordWeComMenu) CreateMenu(_ context.Context, menu wecom.Menu) error {
+	r.menus = append(r.menus, menu)
 	return nil
 }
 
@@ -119,6 +129,38 @@ func TestRouter_Menu_SendsServiceSelectCard(t *testing.T) {
 	}
 }
 
+func TestRouter_ClickCoreMenu_SendsServiceSelectCard(t *testing.T) {
+	t.Parallel()
+
+	rec := &recordWeCom{}
+	userID := "u"
+
+	r := NewRouter(RouterDeps{
+		WeCom: rec,
+		AllowedUserID: map[string]struct{}{
+			userID: {},
+		},
+		Providers: []ServiceProvider{
+			&fakeProvider{key: "unraid", name: "Unraid 容器"},
+			&fakeProvider{key: "qinglong", name: "青龙(QL)"},
+		},
+		State: NewStateStore(1 * time.Minute),
+	})
+
+	if err := r.HandleMessage(context.Background(), wecom.IncomingMessage{
+		FromUserName: userID,
+		MsgType:      "event",
+		Event:        "CLICK",
+		EventKey:     wecom.EventKeyCoreMenu,
+	}); err != nil {
+		t.Fatalf("HandleMessage() error: %v", err)
+	}
+
+	if got := len(rec.cards); got != 1 {
+		t.Fatalf("template card count = %d, want 1", got)
+	}
+}
+
 func TestRouter_DirectKeyword_EntersProvider(t *testing.T) {
 	t.Parallel()
 
@@ -148,6 +190,69 @@ func TestRouter_DirectKeyword_EntersProvider(t *testing.T) {
 
 	if unraid.onEnter != 1 {
 		t.Fatalf("unraid OnEnter hits = %d, want 1", unraid.onEnter)
+	}
+}
+
+func TestRouter_Help_SendsTextHelp(t *testing.T) {
+	t.Parallel()
+
+	rec := &recordWeCom{}
+	userID := "u"
+
+	r := NewRouter(RouterDeps{
+		WeCom: rec,
+		AllowedUserID: map[string]struct{}{
+			userID: {},
+		},
+		State: NewStateStore(1 * time.Minute),
+	})
+
+	if err := r.HandleMessage(context.Background(), wecom.IncomingMessage{
+		FromUserName: userID,
+		MsgType:      "text",
+		Content:      "help",
+	}); err != nil {
+		t.Fatalf("HandleMessage() error: %v", err)
+	}
+
+	if got := len(rec.texts); got != 1 {
+		t.Fatalf("text message count = %d, want 1", got)
+	}
+	if got := len(rec.cards); got != 0 {
+		t.Fatalf("template card count = %d, want 0", got)
+	}
+	if !strings.Contains(rec.texts[0].Content, "可用命令") {
+		t.Fatalf("help reply = %q, want contains %q", rec.texts[0].Content, "可用命令")
+	}
+}
+
+func TestRouter_SyncMenu_CallsCreateMenu(t *testing.T) {
+	t.Parallel()
+
+	rec := &recordWeComMenu{}
+	userID := "u"
+
+	r := NewRouter(RouterDeps{
+		WeCom: rec,
+		AllowedUserID: map[string]struct{}{
+			userID: {},
+		},
+		State: NewStateStore(1 * time.Minute),
+	})
+
+	if err := r.HandleMessage(context.Background(), wecom.IncomingMessage{
+		FromUserName: userID,
+		MsgType:      "text",
+		Content:      "同步菜单",
+	}); err != nil {
+		t.Fatalf("HandleMessage() error: %v", err)
+	}
+
+	if got := len(rec.menus); got != 1 {
+		t.Fatalf("CreateMenu hits = %d, want 1", got)
+	}
+	if got := len(rec.texts); got != 1 {
+		t.Fatalf("text message count = %d, want 1", got)
 	}
 }
 

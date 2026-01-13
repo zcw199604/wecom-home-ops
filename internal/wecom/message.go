@@ -19,6 +19,11 @@ type IncomingMessage struct {
 const (
 	EventKeyServiceSelectPrefix = "svc.select."
 
+	// core.* 约定用于“应用自定义菜单（CLICK）”与通用命令的 EventKey。
+	EventKeyCoreMenu     = "core.menu"
+	EventKeyCoreHelp     = "core.help"
+	EventKeyCoreSelfTest = "core.selftest"
+
 	EventKeyUnraidMenuOps     = "unraid.menu.ops"
 	EventKeyUnraidMenuView    = "unraid.menu.view"
 	EventKeyUnraidBackToMenu  = "unraid.menu.back"
@@ -46,6 +51,58 @@ const (
 	EventKeyConfirm = "core.action.confirm"
 	EventKeyCancel  = "core.action.cancel"
 )
+
+// Menu 定义企业微信“应用自定义菜单”的请求体。
+//
+// 官方文档（SSOT）：
+// - 创建菜单：https://developer.work.weixin.qq.com/document/path/90231
+// - 获取菜单：https://developer.work.weixin.qq.com/document/path/90232
+// - 删除菜单：https://developer.work.weixin.qq.com/document/path/90233
+type Menu struct {
+	Buttons []MenuButton `json:"button"`
+}
+
+// MenuButton 定义菜单按钮（最多 3 个一级按钮，每个最多 5 个二级按钮）。
+type MenuButton struct {
+	Type string `json:"type,omitempty"`
+	Name string `json:"name"`
+	Key  string `json:"key,omitempty"`
+	URL  string `json:"url,omitempty"`
+
+	SubButtons []MenuButton `json:"sub_button,omitempty"`
+}
+
+// DefaultMenu 返回本项目推荐的“应用自定义菜单”。
+// 该菜单以 CLICK 事件为主，EventKey 与回调路由约定保持一致。
+func DefaultMenu() Menu {
+	return Menu{
+		Buttons: []MenuButton{
+			{
+				Name: "常用",
+				SubButtons: []MenuButton{
+					{Type: "click", Name: "操作菜单", Key: EventKeyCoreMenu},
+					{Type: "click", Name: "自检", Key: EventKeyCoreSelfTest},
+					{Type: "click", Name: "帮助", Key: EventKeyCoreHelp},
+				},
+			},
+			{
+				Name: "Unraid",
+				SubButtons: []MenuButton{
+					{Type: "click", Name: "进入菜单", Key: EventKeyServiceSelectPrefix + "unraid"},
+					{Type: "click", Name: "容器操作", Key: EventKeyUnraidMenuOps},
+					{Type: "click", Name: "容器查看", Key: EventKeyUnraidMenuView},
+				},
+			},
+			{
+				Name: "青龙",
+				SubButtons: []MenuButton{
+					{Type: "click", Name: "进入青龙", Key: EventKeyServiceSelectPrefix + "qinglong"},
+					{Type: "click", Name: "动作菜单", Key: EventKeyQinglongMenu},
+				},
+			},
+		},
+	}
+}
 
 type TextMessage struct {
 	ToUser  string

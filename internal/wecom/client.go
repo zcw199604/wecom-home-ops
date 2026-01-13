@@ -66,6 +66,77 @@ func (c *Client) SendTemplateCard(ctx context.Context, msg TemplateCardMessage) 
 	return c.sendMessage(ctx, payload)
 }
 
+// CreateMenu 创建/覆盖企业微信自建应用的自定义菜单。
+//
+// 官方文档（SSOT）：创建菜单
+// https://developer.work.weixin.qq.com/document/path/90231
+func (c *Client) CreateMenu(ctx context.Context, menu Menu) error {
+	start := time.Now()
+
+	token, err := c.getAccessToken(ctx)
+	if err != nil {
+		slog.Error("wecom menu/create 获取 access_token 失败", "error", err)
+		return err
+	}
+
+	u := c.cfg.APIBaseURL +
+		"/menu/create?access_token=" + url.QueryEscape(token) +
+		"&agentid=" + strconv.Itoa(c.cfg.AgentID)
+	body, err := json.Marshal(menu)
+	if err != nil {
+		slog.Error("wecom menu/create 编码 payload 失败", "error", err)
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(body))
+	if err != nil {
+		slog.Error("wecom menu/create 创建请求失败", "error", err)
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		slog.Error("wecom menu/create HTTP 请求失败",
+			"error", err,
+			"duration_ms", time.Since(start).Milliseconds(),
+		)
+		return err
+	}
+	defer res.Body.Close()
+
+	var out struct {
+		ErrCode int    `json:"errcode"`
+		ErrMsg  string `json:"errmsg"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+		slog.Error("wecom menu/create 解析响应失败",
+			"error", err,
+			"status_code", res.StatusCode,
+			"duration_ms", time.Since(start).Milliseconds(),
+		)
+		return err
+	}
+
+	attrs := []any{
+		"status_code", res.StatusCode,
+		"duration_ms", time.Since(start).Milliseconds(),
+		"errcode", out.ErrCode,
+		"errmsg", out.ErrMsg,
+		"agentid", c.cfg.AgentID,
+		"top_buttons", len(menu.Buttons),
+	}
+
+	if out.ErrCode != 0 {
+		apiErr := fmt.Errorf("wecom api error: %d %s", out.ErrCode, out.ErrMsg)
+		slog.Error("wecom menu/create 返回错误", append(attrs, "error", apiErr)...)
+		return apiErr
+	}
+
+	slog.Info("wecom menu/create 成功", attrs...)
+	return nil
+}
+
 // UpdateTemplateCardButton 将模板卡片的按钮更新为不可点击状态（替换按钮文案）。
 //
 // 官方文档（SSOT）：更新模版卡片消息

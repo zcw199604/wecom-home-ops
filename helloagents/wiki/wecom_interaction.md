@@ -12,6 +12,9 @@
 - 发送应用消息（message/send、模板卡片类型与字段约束）：https://developer.work.weixin.qq.com/document/path/90236
 - 更新模版卡片消息（update_template_card、消费 ResponseCode）：https://developer.work.weixin.qq.com/document/90000/90135/94888
 - 获取 access_token（gettoken）：https://developer.work.weixin.qq.com/document/path/91039
+- 应用自定义菜单：创建菜单（menu/create）：https://developer.work.weixin.qq.com/document/path/90231
+- 应用自定义菜单：获取菜单（menu/get）：https://developer.work.weixin.qq.com/document/path/90232
+- 应用自定义菜单：删除菜单（menu/delete）：https://developer.work.weixin.qq.com/document/path/90233
 
 ## 交互链路总览
 
@@ -280,12 +283,12 @@ curl -sS -X POST 'https://qyapi.weixin.qq.com/cgi-bin/message/update_template_ca
 
 - 路由：`internal/core/router.go`
   - `MsgType=text`：关键词触发（如“菜单”）+ 参数输入
-  - `MsgType=event`：处理 `enter_agent` 与 `template_card_event`（按钮回调）
+  - `MsgType=event`：处理 `enter_agent` / `template_card_event`（卡片按钮回调）/ `CLICK`（应用自定义菜单）
 - 状态：`internal/core/state.go`（step/action/参数/TTL）
 
 ### 收发自检（自动回复）
 
-- 白名单用户发送 `ping` 或 `自检`，服务会回复 `pong` 并附带 `server_time/msg_id` 等诊断字段，用于快速验证“回调接收 + 发消息 API”链路是否正常。
+- 白名单用户发送 `ping`/`/ping` 或 `自检`（或点击应用底部菜单“自检”），服务会回复 `pong` 并附带 `server_time/msg_id` 等诊断字段，用于快速验证“回调接收 + 发消息 API”链路是否正常。
 - 代码位置：`internal/core/router.go`
 
 ### 模板卡片构建与事件 key 约定
@@ -295,6 +298,7 @@ curl -sS -X POST 'https://qyapi.weixin.qq.com/cgi-bin/message/update_template_ca
   - `unraid.*`：Unraid 菜单与动作
   - `qinglong.*`：青龙菜单与动作
   - `core.action.confirm` / `core.action.cancel`：二次确认/取消
+  - `core.menu` / `core.help` / `core.selftest`：通用命令与应用自定义菜单（CLICK）的 EventKey
 
 ### 发消息（文本/模板卡片）
 
@@ -302,6 +306,7 @@ curl -sS -X POST 'https://qyapi.weixin.qq.com/cgi-bin/message/update_template_ca
   - `gettoken`：本地缓存 + singleflight 合并刷新
   - `message/send`：发送 text/template_card
   - `message/update_template_card`：消费 `ResponseCode` 更新卡片按钮为不可点击状态
+  - `menu/create`：同步应用自定义菜单（默认菜单见 `wecom.DefaultMenu()`）
   - `task_id`：若未提供则自动生成 `wecom-home-ops-<unixnano>`（用于回调关联）
 
 ## 排障清单（高频问题）

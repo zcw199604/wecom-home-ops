@@ -33,6 +33,10 @@ type templateCardUpdater interface {
 	UpdateTemplateCardButton(ctx context.Context, responseCode string, replaceName string) error
 }
 
+type menuCreator interface {
+	CreateMenu(ctx context.Context, menu wecom.Menu) error
+}
+
 func NewRouter(deps RouterDeps) *Router {
 	state := deps.State
 	if state == nil {
@@ -92,7 +96,7 @@ func (r *Router) HandleMessage(ctx context.Context, msg wecom.IncomingMessage) e
 	}
 
 	if msg.MsgType == "text" {
-		if isSelfTestKeyword(normalizeKeyword(msg.Content)) {
+		if isSelfTestKeyword(normalizeCommandKeyword(msg.Content)) {
 			return r.WeCom.SendText(ctx, wecom.TextMessage{
 				ToUser:  userID,
 				Content: buildSelfTestReply(msg),
@@ -119,16 +123,31 @@ func (r *Router) handleText(ctx context.Context, userID string, content string) 
 		return nil
 	}
 
-	normalized := normalizeKeyword(content)
-	if isMenuKeyword(normalized) {
+	keyword := normalizeCommandKeyword(content)
+	if isHelpKeyword(keyword) {
+		return r.sendHelp(ctx, userID)
+	}
+	if isMenuSyncKeyword(keyword) {
+		return r.syncWeComMenu(ctx, userID)
+	}
+
+	if isMenuKeyword(keyword) {
 		r.state.Clear(userID)
 		return r.sendServiceMenu(ctx, userID)
 	}
 
+	normalized := normalizeKeyword(content)
 	if providerKey, ok := r.keywordIndex[normalized]; ok {
 		r.state.Clear(userID)
 		r.state.Set(userID, ConversationState{ServiceKey: providerKey})
 		return r.enterProvider(ctx, userID, providerKey)
+	}
+	if strings.HasPrefix(strings.TrimSpace(content), "/") {
+		if providerKey, ok := r.keywordIndex[keyword]; ok {
+			r.state.Clear(userID)
+			r.state.Set(userID, ConversationState{ServiceKey: providerKey})
+			return r.enterProvider(ctx, userID, providerKey)
+		}
 	}
 
 	state, ok := r.state.Get(userID)
@@ -146,36 +165,51 @@ func (r *Router) handleText(ctx context.Context, userID string, content string) 
 
 	return r.WeCom.SendText(ctx, wecom.TextMessage{
 		ToUser:  userID,
-		Content: "请输入“菜单”打开操作菜单。",
+		Content: "请输入“菜单”打开操作菜单，或输入“帮助”查看可用命令。",
 	})
 }
 
 func (r *Router) handleEvent(ctx context.Context, userID string, msg wecom.IncomingMessage) error {
-	if msg.Event == "enter_agent" {
+	event := strings.ToLower(strings.TrimSpace(msg.Event))
+	if event == "enter_agent" {
 		r.state.Clear(userID)
 		return r.sendServiceMenu(ctx, userID)
 	}
 
-	if msg.Event != "template_card_event" {
+	isTemplateCardEvent := event == "template_card_event"
+	isClickEvent := event == "click"
+	if !isTemplateCardEvent && !isClickEvent {
 		return nil
 	}
 
 	key := strings.TrimSpace(msg.EventKey)
-	if updater, ok := r.WeCom.(templateCardUpdater); ok {
-		responseCode := strings.TrimSpace(msg.ResponseCode)
-		if responseCode != "" {
-			if err := updater.UpdateTemplateCardButton(ctx, responseCode, r.templateCardReplaceName(key)); err != nil {
-				slog.Error("wecom 更新模板卡片按钮失败",
-					"error", err,
-					"user_id", userID,
-					"event_key", key,
-					"response_code_len", len(responseCode),
-				)
+	if isTemplateCardEvent {
+		if updater, ok := r.WeCom.(templateCardUpdater); ok {
+			responseCode := strings.TrimSpace(msg.ResponseCode)
+			if responseCode != "" {
+				if err := updater.UpdateTemplateCardButton(ctx, responseCode, r.templateCardReplaceName(key)); err != nil {
+					slog.Error("wecom 更新模板卡片按钮失败",
+						"error", err,
+						"user_id", userID,
+						"event_key", key,
+						"response_code_len", len(responseCode),
+					)
+				}
 			}
 		}
 	}
 	if key == "" {
 		return nil
+	}
+
+	switch key {
+	case wecom.EventKeyCoreMenu:
+		r.state.Clear(userID)
+		return r.sendServiceMenu(ctx, userID)
+	case wecom.EventKeyCoreHelp:
+		return r.sendHelp(ctx, userID)
+	case wecom.EventKeyCoreSelfTest:
+		return r.WeCom.SendText(ctx, wecom.TextMessage{ToUser: userID, Content: buildSelfTestReply(msg)})
 	}
 
 	switch key {
@@ -314,9 +348,42 @@ func normalizeKeyword(s string) string {
 	return strings.ToLower(strings.TrimSpace(s))
 }
 
+func normalizeCommandKeyword(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	fields := strings.Fields(s)
+	if len(fields) == 0 {
+		return ""
+	}
+	token := strings.TrimSpace(fields[0])
+	token = strings.TrimPrefix(token, "/")
+	token = strings.TrimPrefix(token, "!")
+	return normalizeKeyword(token)
+}
+
 func isMenuKeyword(normalized string) bool {
 	switch normalized {
-	case "help", "menu", "菜单":
+	case "menu", "菜单":
+		return true
+	default:
+		return false
+	}
+}
+
+func isHelpKeyword(normalized string) bool {
+	switch normalized {
+	case "help", "帮助", "?", "？":
+		return true
+	default:
+		return false
+	}
+}
+
+func isMenuSyncKeyword(normalized string) bool {
+	switch normalized {
+	case "同步菜单", "更新菜单", "syncmenu", "sync-menu":
 		return true
 	default:
 		return false
@@ -325,11 +392,63 @@ func isMenuKeyword(normalized string) bool {
 
 func isSelfTestKeyword(normalized string) bool {
 	switch normalized {
-	case "ping", "/ping", "自检":
+	case "ping", "自检":
 		return true
 	default:
 		return false
 	}
+}
+
+func (r *Router) sendHelp(ctx context.Context, userID string) error {
+	services := make([]string, 0, len(r.providerList))
+	for _, p := range r.providerList {
+		if p == nil {
+			continue
+		}
+		name := strings.TrimSpace(p.DisplayName())
+		if name == "" {
+			continue
+		}
+		services = append(services, name)
+	}
+	sort.Strings(services)
+
+	var b strings.Builder
+	b.WriteString("可用命令：")
+	b.WriteString("\n- 菜单 /menu：打开操作菜单")
+	b.WriteString("\n- 帮助 /help：查看帮助")
+	b.WriteString("\n- 自检 /ping：收发自检（pong）")
+	b.WriteString("\n- 同步菜单：创建/覆盖企业微信应用自定义菜单（管理员功能）")
+	if len(services) > 0 {
+		b.WriteString("\n\n已启用服务：")
+		for _, s := range services {
+			b.WriteString("\n- ")
+			b.WriteString(s)
+		}
+	}
+	b.WriteString("\n\n提示：也可以直接点击应用底部自定义菜单触发常用操作。")
+
+	return r.WeCom.SendText(ctx, wecom.TextMessage{ToUser: userID, Content: b.String()})
+}
+
+func (r *Router) syncWeComMenu(ctx context.Context, userID string) error {
+	c, ok := r.WeCom.(menuCreator)
+	if !ok {
+		return r.WeCom.SendText(ctx, wecom.TextMessage{
+			ToUser:  userID,
+			Content: "当前发送端不支持同步菜单。",
+		})
+	}
+	if err := c.CreateMenu(ctx, wecom.DefaultMenu()); err != nil {
+		return r.WeCom.SendText(ctx, wecom.TextMessage{
+			ToUser:  userID,
+			Content: "同步菜单失败：" + err.Error(),
+		})
+	}
+	return r.WeCom.SendText(ctx, wecom.TextMessage{
+		ToUser:  userID,
+		Content: "已同步应用自定义菜单。可重新进入应用会话查看底部菜单。",
+	})
 }
 
 func buildSelfTestReply(msg wecom.IncomingMessage) string {
