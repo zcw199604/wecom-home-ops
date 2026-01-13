@@ -289,6 +289,9 @@ func TestRouter_SelfTestPing_AutoReplies(t *testing.T) {
 	if !strings.HasPrefix(rec.texts[0].Content, "pong\nserver_time: ") {
 		t.Fatalf("reply = %q, want prefix %q", rec.texts[0].Content, "pong\\nserver_time: ")
 	}
+	if strings.Contains(rec.texts[0].Content, "\nto: ") {
+		t.Fatalf("reply = %q, want no to field", rec.texts[0].Content)
+	}
 	if !strings.Contains(rec.texts[0].Content, "\nmsg_id: 123") {
 		t.Fatalf("reply = %q, want msg_id 123", rec.texts[0].Content)
 	}
