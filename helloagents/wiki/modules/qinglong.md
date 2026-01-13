@@ -44,6 +44,10 @@
 ## API接口
 本模块不直接对外提供 HTTP API，通过内部接口供 core 调用；对青龙侧通过 OpenAPI 发起 HTTP 请求（如 `/open/auth/token`、`/open/crons` 等）。
 
+### OpenAPI 调用方式（整理）
+- 调用约定与排障示例：`helloagents/wiki/qinglong_openapi.md`
+- 代码实现参考：`internal/qinglong/client.go`
+
 ## 数据模型
 - `qinglong.instances[].base_url`
 - `qinglong.instances[].client_id`

@@ -34,4 +34,5 @@
 - [架构设计](arch.md)
 - [API 手册](api.md)
 - [数据模型](data.md)
+- [青龙 OpenAPI 调用方式](qinglong_openapi.md)
 - [变更历史](../history/index.md)
