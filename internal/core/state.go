@@ -15,6 +15,11 @@ const (
 	StepAwaitingConfirm               Step = "awaiting_confirm"
 	StepAwaitingQinglongSearchKeyword Step = "awaiting_qinglong_search_keyword"
 	StepAwaitingQinglongCronID        Step = "awaiting_qinglong_cron_id"
+
+	// StepAwaitingUnraidOpsAction 表示处于 Unraid “容器操作”菜单选择阶段（文本模式）。
+	StepAwaitingUnraidOpsAction Step = "awaiting_unraid_ops_action"
+	// StepAwaitingUnraidViewAction 表示处于 Unraid “容器查看”菜单选择阶段（文本模式）。
+	StepAwaitingUnraidViewAction Step = "awaiting_unraid_view_action"
 )
 
 type Action string

@@ -124,6 +124,34 @@ func (r *Router) handleText(ctx context.Context, userID string, content string) 
 	}
 
 	keyword := normalizeCommandKeyword(content)
+
+	if state, ok := r.state.Get(userID); ok && strings.TrimSpace(state.ServiceKey) != "" && state.Step == StepAwaitingConfirm {
+		if isConfirmKeyword(keyword) {
+			p, ok := r.providers[state.ServiceKey]
+			if !ok {
+				r.state.Clear(userID)
+				return r.WeCom.SendText(ctx, wecom.TextMessage{
+					ToUser:  userID,
+					Content: "服务不可用，请输入“菜单”重新开始。",
+				})
+			}
+			handled, err := p.HandleConfirm(ctx, userID)
+			if err != nil {
+				return err
+			}
+			if handled {
+				return nil
+			}
+		}
+		if isCancelKeyword(keyword) {
+			r.state.Clear(userID)
+			return r.WeCom.SendText(ctx, wecom.TextMessage{
+				ToUser:  userID,
+				Content: "已取消。",
+			})
+		}
+	}
+
 	if isHelpKeyword(keyword) {
 		return r.sendHelp(ctx, userID)
 	}
@@ -410,6 +438,24 @@ func isMenuSyncKeyword(normalized string) bool {
 func isSelfTestKeyword(normalized string) bool {
 	switch normalized {
 	case "ping", "自检":
+		return true
+	default:
+		return false
+	}
+}
+
+func isConfirmKeyword(normalized string) bool {
+	switch normalized {
+	case "确认", "confirm", "yes", "y":
+		return true
+	default:
+		return false
+	}
+}
+
+func isCancelKeyword(normalized string) bool {
+	switch normalized {
+	case "取消", "cancel", "no", "n":
 		return true
 	default:
 		return false

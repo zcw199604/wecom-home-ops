@@ -284,6 +284,7 @@ curl -sS -X POST 'https://qyapi.weixin.qq.com/cgi-bin/message/update_template_ca
 - 路由：`internal/core/router.go`
   - `MsgType=text`：关键词触发（如“菜单”）+ 参数输入
   - `MsgType=event`：处理 `enter_agent` / `template_card_event`（卡片按钮回调）/ `CLICK`（应用自定义菜单）
+  - `Step=awaiting_confirm`：支持文本“确认/取消”作为兜底（避免卡片不展示时无法继续）
 - 状态：`internal/core/state.go`（step/action/参数/TTL）
 
 ### 收发自检（自动回复）

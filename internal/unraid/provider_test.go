@@ -693,3 +693,39 @@ func TestProvider_MenuNavigation_Cards(t *testing.T) {
 		t.Fatalf("back title = %q, want %q", title, "Unraid 容器")
 	}
 }
+
+func TestProvider_ClickMenuView_FallsBackToTextMenu(t *testing.T) {
+	t.Parallel()
+
+	rec := &recordWeCom{}
+	store := core.NewStateStore(1 * time.Minute)
+	t.Cleanup(store.Close)
+
+	p := NewProvider(ProviderDeps{
+		WeCom:  rec,
+		Client: nil,
+		State:  store,
+	})
+
+	ctx := context.Background()
+	userID := "u"
+
+	if ok, err := p.HandleEvent(ctx, userID, wecom.IncomingMessage{
+		Event:    "CLICK",
+		EventKey: wecom.EventKeyUnraidMenuView,
+	}); err != nil || !ok {
+		t.Fatalf("HandleEvent(click menu view) ok=%v err=%v, want ok=true err=nil", ok, err)
+	}
+
+	if got := len(rec.Texts()); got != 1 {
+		t.Fatalf("text message count = %d, want 1", got)
+	}
+	if got := len(rec.Cards()); got != 0 {
+		t.Fatalf("template card count = %d, want 0", got)
+	}
+
+	st, ok := store.Get(userID)
+	if !ok || st.ServiceKey != "unraid" || st.Step != core.StepAwaitingUnraidViewAction {
+		t.Fatalf("state = %#v ok=%v, want ServiceKey=unraid Step=awaiting_unraid_view_action", st, ok)
+	}
+}

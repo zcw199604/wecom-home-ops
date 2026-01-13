@@ -55,7 +55,45 @@ func (p *Provider) HandleText(ctx context.Context, userID, content string) (bool
 	if !ok || state.ServiceKey != p.Key() {
 		return false, nil
 	}
-	if state.Step != core.StepAwaitingContainerName {
+
+	switch state.Step {
+	case core.StepAwaitingUnraidViewAction:
+		action, ok := parseUnraidViewAction(content)
+		if !ok {
+			return true, p.wecom.SendText(ctx, wecom.TextMessage{
+				ToUser:  userID,
+				Content: unraidViewTextMenu(),
+			})
+		}
+		state.Step = core.StepAwaitingContainerName
+		state.Action = action
+		p.state.Set(userID, state)
+
+		prompt := fmt.Sprintf("已选择动作：%s\n请输入容器名：", action.DisplayName())
+		if action == core.ActionUnraidViewLogs {
+			prompt = fmt.Sprintf("已选择动作：%s\n请输入：容器名 [行数]（默认%d，最大%d）：", action.DisplayName(), defaultLogTail, maxLogTail)
+		}
+		return true, p.wecom.SendText(ctx, wecom.TextMessage{ToUser: userID, Content: prompt})
+
+	case core.StepAwaitingUnraidOpsAction:
+		action, ok := parseUnraidOpsAction(content)
+		if !ok {
+			return true, p.wecom.SendText(ctx, wecom.TextMessage{
+				ToUser:  userID,
+				Content: unraidOpsTextMenu(),
+			})
+		}
+		state.Step = core.StepAwaitingContainerName
+		state.Action = action
+		p.state.Set(userID, state)
+
+		prompt := fmt.Sprintf("已选择动作：%s\n请输入容器名：", action.DisplayName())
+		return true, p.wecom.SendText(ctx, wecom.TextMessage{ToUser: userID, Content: prompt})
+
+	case core.StepAwaitingContainerName:
+		// 继续执行下方输入容器名的逻辑
+
+	default:
 		return false, nil
 	}
 
@@ -77,10 +115,15 @@ func (p *Provider) HandleText(ctx context.Context, userID, content string) (bool
 		state.Step = core.StepAwaitingConfirm
 		p.state.Set(userID, state)
 
-		return true, p.wecom.SendTemplateCard(ctx, wecom.TemplateCardMessage{
+		_ = p.wecom.SendText(ctx, wecom.TextMessage{
+			ToUser:  userID,
+			Content: fmt.Sprintf("确认执行：%s %s\n回复“确认”继续，回复“取消”终止。", state.Action.DisplayName(), state.ContainerName),
+		})
+		_ = p.wecom.SendTemplateCard(ctx, wecom.TemplateCardMessage{
 			ToUser: userID,
 			Card:   wecom.NewConfirmCard(state.Action.DisplayName(), state.ContainerName),
 		})
+		return true, nil
 	}
 
 	// 查看类动作：执行并回显，清除“待输入”状态但保留 ServiceKey。
@@ -95,14 +138,30 @@ func (p *Provider) HandleText(ctx context.Context, userID, content string) (bool
 
 func (p *Provider) HandleEvent(ctx context.Context, userID string, msg wecom.IncomingMessage) (bool, error) {
 	key := strings.TrimSpace(msg.EventKey)
+	event := strings.ToLower(strings.TrimSpace(msg.Event))
 	switch key {
 	case wecom.EventKeyUnraidMenuOps:
+		if event == "click" {
+			p.state.Set(userID, core.ConversationState{ServiceKey: p.Key(), Step: core.StepAwaitingUnraidOpsAction})
+			return true, p.wecom.SendText(ctx, wecom.TextMessage{ToUser: userID, Content: unraidOpsTextMenu()})
+		}
 		p.state.Set(userID, core.ConversationState{ServiceKey: p.Key()})
 		return true, p.wecom.SendTemplateCard(ctx, wecom.TemplateCardMessage{ToUser: userID, Card: wecom.NewUnraidOpsCard()})
 	case wecom.EventKeyUnraidMenuView:
+		if event == "click" {
+			p.state.Set(userID, core.ConversationState{ServiceKey: p.Key(), Step: core.StepAwaitingUnraidViewAction})
+			return true, p.wecom.SendText(ctx, wecom.TextMessage{ToUser: userID, Content: unraidViewTextMenu()})
+		}
 		p.state.Set(userID, core.ConversationState{ServiceKey: p.Key()})
 		return true, p.wecom.SendTemplateCard(ctx, wecom.TemplateCardMessage{ToUser: userID, Card: wecom.NewUnraidViewCard()})
 	case wecom.EventKeyUnraidBackToMenu:
+		if event == "click" {
+			p.state.Set(userID, core.ConversationState{ServiceKey: p.Key()})
+			return true, p.wecom.SendText(ctx, wecom.TextMessage{
+				ToUser:  userID,
+				Content: "已返回。可通过底部菜单选择“容器操作/容器查看”，或直接输入“容器”。",
+			})
+		}
 		p.state.Set(userID, core.ConversationState{ServiceKey: p.Key()})
 		return true, p.wecom.SendTemplateCard(ctx, wecom.TemplateCardMessage{ToUser: userID, Card: wecom.NewUnraidEntryCard()})
 
@@ -122,6 +181,53 @@ func (p *Provider) HandleEvent(ctx context.Context, userID string, msg wecom.Inc
 		return true, p.wecom.SendText(ctx, wecom.TextMessage{ToUser: userID, Content: prompt})
 	default:
 		return false, nil
+	}
+}
+
+func unraidViewTextMenu() string {
+	return "Unraid 容器查看（文本模式）\n" +
+		"1. 查看状态\n" +
+		"2. 资源概览\n" +
+		"3. 资源详情\n" +
+		"4. 查看日志\n" +
+		"\n回复序号选择。"
+}
+
+func unraidOpsTextMenu() string {
+	return "Unraid 容器操作（文本模式）\n" +
+		"1. 重启容器\n" +
+		"2. 停止容器\n" +
+		"3. 强制更新\n" +
+		"\n回复序号选择。"
+}
+
+func parseUnraidViewAction(input string) (core.Action, bool) {
+	s := strings.ToLower(strings.TrimSpace(input))
+	switch s {
+	case "1", "状态", "查看状态", "status":
+		return core.ActionUnraidViewStatus, true
+	case "2", "概览", "资源概览", "stats":
+		return core.ActionUnraidViewStats, true
+	case "3", "详情", "资源详情", "detail":
+		return core.ActionUnraidViewStatsDetail, true
+	case "4", "日志", "查看日志", "logs":
+		return core.ActionUnraidViewLogs, true
+	default:
+		return "", false
+	}
+}
+
+func parseUnraidOpsAction(input string) (core.Action, bool) {
+	s := strings.ToLower(strings.TrimSpace(input))
+	switch s {
+	case "1", "重启", "重启容器", "restart":
+		return core.ActionUnraidRestart, true
+	case "2", "停止", "停止容器", "stop":
+		return core.ActionUnraidStop, true
+	case "3", "强制更新", "更新", "update":
+		return core.ActionUnraidForceUpdate, true
+	default:
+		return "", false
 	}
 }
 

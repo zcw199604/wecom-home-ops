@@ -359,6 +359,42 @@ func TestRouter_Confirm_DispatchesByStateServiceKey(t *testing.T) {
 	}
 }
 
+func TestRouter_TextConfirm_DispatchesByStateServiceKey(t *testing.T) {
+	t.Parallel()
+
+	rec := &recordWeCom{}
+	userID := "u"
+	state := NewStateStore(1 * time.Minute)
+
+	unraid := &fakeProvider{key: "unraid", name: "Unraid 容器", confirmHandled: true}
+	r := NewRouter(RouterDeps{
+		WeCom: rec,
+		AllowedUserID: map[string]struct{}{
+			userID: {},
+		},
+		Providers: []ServiceProvider{
+			unraid,
+		},
+		State: state,
+	})
+
+	state.Set(userID, ConversationState{
+		ServiceKey: "unraid",
+		Step:       StepAwaitingConfirm,
+	})
+
+	if err := r.HandleMessage(context.Background(), wecom.IncomingMessage{
+		FromUserName: userID,
+		MsgType:      "text",
+		Content:      "确认",
+	}); err != nil {
+		t.Fatalf("HandleMessage() error: %v", err)
+	}
+	if unraid.onConfirm != 1 {
+		t.Fatalf("provider HandleConfirm hits = %d, want 1", unraid.onConfirm)
+	}
+}
+
 func TestRouter_TemplateCardEvent_UpdatesButtonByResponseCode(t *testing.T) {
 	t.Parallel()
 
