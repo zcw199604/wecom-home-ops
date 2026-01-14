@@ -27,7 +27,8 @@ type ClientConfig struct {
 	StatsField  string
 	StatsFields []string
 
-	// “强制更新”mutation 配置（默认 update）。默认形态：docker { update(id: PrefixedID!) { __typename } }
+	// “强制更新”mutation 配置（默认 updateContainer）。
+	// 默认形态：docker { updateContainer(id: PrefixedID!) { __typename } }
 	ForceUpdateMutation     string
 	ForceUpdateArgName      string
 	ForceUpdateArgType      string
@@ -73,7 +74,7 @@ func applyClientDefaults(cfg *ClientConfig) {
 	}
 
 	if strings.TrimSpace(cfg.ForceUpdateMutation) == "" {
-		cfg.ForceUpdateMutation = "update"
+		cfg.ForceUpdateMutation = "updateContainer"
 	}
 	if strings.TrimSpace(cfg.ForceUpdateArgName) == "" {
 		cfg.ForceUpdateArgName = "id"

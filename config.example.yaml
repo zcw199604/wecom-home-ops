@@ -54,7 +54,7 @@ unraid:
     - "pids"
 
   # 容器操作：强制更新（默认 update(id: PrefixedID!) { __typename }）
-  force_update_mutation: "update"
+  force_update_mutation: "updateContainer"
   force_update_arg: "id"
   force_update_arg_type: "PrefixedID!"
   force_update_return_fields:

@@ -148,8 +148,8 @@ func TestApplyDefaults(t *testing.T) {
 	if len(cfg.Unraid.StatsFields) == 0 {
 		t.Fatalf("Unraid.StatsFields empty, want defaults")
 	}
-	if cfg.Unraid.ForceUpdateMutation != "update" {
-		t.Fatalf("Unraid.ForceUpdateMutation = %q, want %q", cfg.Unraid.ForceUpdateMutation, "update")
+	if cfg.Unraid.ForceUpdateMutation != "updateContainer" {
+		t.Fatalf("Unraid.ForceUpdateMutation = %q, want %q", cfg.Unraid.ForceUpdateMutation, "updateContainer")
 	}
 	if cfg.Unraid.ForceUpdateArgName != "id" {
 		t.Fatalf("Unraid.ForceUpdateArgName = %q, want %q", cfg.Unraid.ForceUpdateArgName, "id")

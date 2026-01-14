@@ -243,7 +243,7 @@ func applyDefaults(cfg *Config) {
 		cfg.Unraid.StatsFields = []string{"cpuPercent", "memUsage", "memLimit", "netIO", "blockIO", "pids"}
 	}
 	if cfg.Unraid.ForceUpdateMutation == "" {
-		cfg.Unraid.ForceUpdateMutation = "update"
+		cfg.Unraid.ForceUpdateMutation = "updateContainer"
 	}
 	if cfg.Unraid.ForceUpdateArgName == "" {
 		cfg.Unraid.ForceUpdateArgName = "id"
