@@ -53,7 +53,7 @@ unraid:
     - "blockIO"
     - "pids"
 
-  # 容器操作：强制更新（默认 update(id: PrefixedID!) { __typename }）
+  # 容器操作：强制更新（默认 updateContainer(id: PrefixedID!) { __typename }；如上游不支持可尝试 update）
   force_update_mutation: "updateContainer"
   force_update_arg: "id"
   force_update_arg_type: "PrefixedID!"

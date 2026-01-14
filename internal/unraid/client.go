@@ -695,10 +695,61 @@ func isCannotQueryField(err error, field string) bool {
 		return false
 	}
 	msg := err.Error()
-	if strings.Contains(msg, `Cannot query field "`+field+`"`) {
+	if !strings.Contains(msg, "Cannot query field") {
+		return false
+	}
+
+	candidates := []string{
+		`Cannot query field "` + field + `"`,
+		`Cannot query field \"` + field + `\"`,
+		`Cannot query field \\\"` + field + `\\\"`,
+		`Cannot query field '` + field + `'`,
+	}
+	for _, c := range candidates {
+		if strings.Contains(msg, c) {
+			return true
+		}
+	}
+
+	// 兜底：不同实现的转义/引号风格可能不一致，但仍会同时包含固定前缀与字段名。
+	prefixIdx := strings.Index(msg, "Cannot query field")
+	if prefixIdx < 0 {
+		return false
+	}
+	return containsGraphQLIdentifierToken(msg[prefixIdx:], field)
+}
+
+func containsGraphQLIdentifierToken(s string, token string) bool {
+	if token == "" {
+		return false
+	}
+	for idx := strings.Index(s, token); idx >= 0; {
+		beforeOK := idx == 0 || !isGraphQLIdentifierChar(s[idx-1])
+		after := idx + len(token)
+		afterOK := after >= len(s) || !isGraphQLIdentifierChar(s[after])
+		if beforeOK && afterOK {
+			return true
+		}
+		next := strings.Index(s[idx+1:], token)
+		if next < 0 {
+			break
+		}
+		idx += next + 1
+	}
+	return false
+}
+
+func isGraphQLIdentifierChar(b byte) bool {
+	if b == '_' {
 		return true
 	}
-	if strings.Contains(msg, `Cannot query field \"`+field+`\"`) {
+	if b >= '0' && b <= '9' {
+		return true
+	}
+	if b >= 'A' && b <= 'Z' {
+		return true
+	}
+	if b >= 'a' && b <= 'z' {
 		return true
 	}
 	return false

@@ -26,6 +26,7 @@
 | 202601131307 | wecom_pkcs7_padding_fix | 修复 | ✅已完成 | [202601131307_wecom_pkcs7_padding_fix](2026-01/202601131307_wecom_pkcs7_padding_fix/) |
 | 202601131356 | wecom_custom_menu | 功能 | ✅已完成 | [202601131356_wecom_custom_menu](2026-01/202601131356_wecom_custom_menu/) |
 | 202601131512 | startup_notify_wecom | 功能 | ✅已完成 | [202601131512_startup_notify_wecom](2026-01/202601131512_startup_notify_wecom/) |
+| 202601141207 | unraid_force_update_compat | 修复 | ✅已完成 | [202601141207_unraid_force_update_compat](2026-01/202601141207_unraid_force_update_compat/) |
 
 ---
 
@@ -51,3 +52,4 @@
 - [202601131307_wecom_pkcs7_padding_fix](2026-01/202601131307_wecom_pkcs7_padding_fix/) - 企业微信回调解密 PKCS7 padding 对齐修复（blockSize=32）
 - [202601131356_wecom_custom_menu](2026-01/202601131356_wecom_custom_menu/) - 企业微信应用自定义菜单（底部菜单）同步 + CLICK 事件路由 + 通用命令
 - [202601131512_startup_notify_wecom](2026-01/202601131512_startup_notify_wecom/) - 启动成功后推送企业微信应用消息（诊断信息）
+- [202601141207_unraid_force_update_compat](2026-01/202601141207_unraid_force_update_compat/) - Unraid 强制更新回退兼容（错误转义差异）
