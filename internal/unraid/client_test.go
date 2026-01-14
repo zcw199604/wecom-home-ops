@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -106,6 +107,91 @@ func TestClient_RestartStopForceUpdate(t *testing.T) {
 	}
 	if err := c.ForceUpdateContainerByName(ctx, "app"); err != nil {
 		t.Fatalf("ForceUpdateContainerByName() error: %v", err)
+	}
+}
+
+func TestClient_ForceUpdate_FallbackMutationName(t *testing.T) {
+	t.Parallel()
+
+	var updateCalls int32
+	var updateContainerCalls int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req graphQLRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		q := req.Query
+
+		switch {
+		case strings.Contains(q, "docker { containers"):
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"data": map[string]interface{}{
+					"docker": map[string]interface{}{
+						"containers": []map[string]interface{}{
+							{
+								"id":     "docker:abc",
+								"names":  []string{"app"},
+								"state":  "running",
+								"status": "Up",
+							},
+						},
+					},
+				},
+			})
+			return
+
+		case strings.Contains(q, "mutation ForceUpdate") && strings.Contains(q, "update("):
+			atomic.AddInt32(&updateCalls, 1)
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"errors": []map[string]interface{}{
+					{"message": "Cannot query field \"update\" on type \"DockerMutations\"."},
+				},
+			})
+			return
+
+		case strings.Contains(q, "mutation ForceUpdate") && strings.Contains(q, "updateContainer("):
+			atomic.AddInt32(&updateContainerCalls, 1)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"data": map[string]interface{}{
+					"docker": map[string]interface{}{
+						"updateContainer": map[string]interface{}{
+							"__typename": "DockerContainer",
+						},
+					},
+				},
+			})
+			return
+		default:
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"errors": []map[string]interface{}{
+					{"message": "unexpected query"},
+				},
+			})
+			return
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	c := NewClient(ClientConfig{
+		Endpoint:            srv.URL,
+		APIKey:              "k",
+		Origin:              "o",
+		ForceUpdateMutation: "update",
+	}, srv.Client())
+
+	if err := c.ForceUpdateContainerByName(context.Background(), "app"); err != nil {
+		t.Fatalf("ForceUpdateContainerByName() error: %v", err)
+	}
+
+	if atomic.LoadInt32(&updateCalls) != 1 {
+		t.Fatalf("update calls = %d, want 1", updateCalls)
+	}
+	if atomic.LoadInt32(&updateContainerCalls) != 1 {
+		t.Fatalf("updateContainer calls = %d, want 1", updateContainerCalls)
 	}
 }
 

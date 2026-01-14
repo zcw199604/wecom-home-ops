@@ -136,9 +136,6 @@ func (c *Client) ForceUpdateContainerByName(ctx context.Context, name string) er
 	if err != nil {
 		return err
 	}
-	if strings.TrimSpace(c.cfg.ForceUpdateMutation) == "" {
-		return errors.New("未配置 unraid.force_update_mutation（已移除 introspection 探测，请在 config.yaml 显式指定）")
-	}
 	return c.callDockerForceUpdateMutation(ctx, id)
 }
 
@@ -617,10 +614,6 @@ func parseUptimeFromDockerStatus(status string) string {
 }
 
 func (c *Client) callDockerForceUpdateMutation(ctx context.Context, id string) error {
-	mutation := strings.TrimSpace(c.cfg.ForceUpdateMutation)
-	if mutation == "" {
-		return errors.New("未配置 unraid.force_update_mutation")
-	}
 	argName := strings.TrimSpace(c.cfg.ForceUpdateArgName)
 	if argName == "" {
 		argName = "id"
@@ -635,14 +628,78 @@ func (c *Client) callDockerForceUpdateMutation(ctx context.Context, id string) e
 		selection = " { " + strings.Join(c.cfg.ForceUpdateReturnFields, " ") + " }"
 	}
 
-	q := fmt.Sprintf(`mutation ForceUpdate($v: %s) { docker { %s(%s: $v)%s } }`, argType, mutation, argName, selection)
-	if err := c.do(ctx, q, map[string]interface{}{"v": id}, nil); err != nil {
-		return wrapMaybeUnsupported(err, "强制更新", []string{
-			"unraid.force_update_mutation",
-			"unraid.force_update_arg",
-			"unraid.force_update_arg_type",
-			"unraid.force_update_return_fields",
-		})
+	cfgKeys := []string{
+		"unraid.force_update_mutation",
+		"unraid.force_update_arg",
+		"unraid.force_update_arg_type",
+		"unraid.force_update_return_fields",
+	}
+
+	mutations := forceUpdateMutationCandidates(c.cfg.ForceUpdateMutation)
+	if len(mutations) == 0 {
+		return errors.New("未配置强制更新 mutation")
+	}
+
+	var lastErr error
+	for idxMutation, mutation := range mutations {
+		q := fmt.Sprintf(`mutation ForceUpdate($v: %s) { docker { %s(%s: $v)%s } }`, argType, mutation, argName, selection)
+		if err := c.do(ctx, q, map[string]interface{}{"v": id}, nil); err != nil {
+			lastErr = err
+			// 兼容：不同 Unraid Connect 版本/实现可能使用不同的 mutation 名称。
+			// 仅当明确为“字段不存在（Cannot query field）”时才回退尝试下一个候选，避免重复执行真实更新操作。
+			if idxMutation+1 < len(mutations) && isCannotQueryField(err, mutation) {
+				continue
+			}
+			return wrapMaybeUnsupported(err, "强制更新", cfgKeys)
+		}
+		return nil
+	}
+	if lastErr != nil {
+		return wrapMaybeUnsupported(lastErr, "强制更新", cfgKeys)
 	}
 	return nil
+}
+
+func forceUpdateMutationCandidates(configured string) []string {
+	var out []string
+	add := func(v string) {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			return
+		}
+		for _, exists := range out {
+			if exists == v {
+				return
+			}
+		}
+		out = append(out, v)
+	}
+
+	add(configured)
+
+	// 目前已知的常见名称（按优先级）：
+	// - updateContainer: Unraid API DockerMutations 常见实现
+	// - update: 历史/兼容命名（部分实现）
+	add("updateContainer")
+	add("update")
+
+	return out
+}
+
+func isCannotQueryField(err error, field string) bool {
+	if err == nil {
+		return false
+	}
+	field = strings.TrimSpace(field)
+	if field == "" {
+		return false
+	}
+	msg := err.Error()
+	if strings.Contains(msg, `Cannot query field "`+field+`"`) {
+		return true
+	}
+	if strings.Contains(msg, `Cannot query field \"`+field+`\"`) {
+		return true
+	}
+	return false
 }

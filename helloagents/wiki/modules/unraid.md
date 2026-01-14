@@ -16,7 +16,7 @@
 - 重启（restart）
 - 停止（stop）
 - 强制更新（force update）
-  - 说明：强制更新依赖 Unraid GraphQL 提供相应 mutation；默认使用 `updateContainer(id: PrefixedID!)`，如不一致需通过配置覆盖（见下文）
+  - 说明：强制更新依赖 Unraid GraphQL 提供相应 mutation；代码会自动回退尝试 `updateContainer(id: PrefixedID!)` 与 `update(id: PrefixedID!)`，如仍不一致再通过配置覆盖（见下文）
 
 ### 需求: 容器查看（状态/资源/日志）
 **模块:** unraid

@@ -28,7 +28,7 @@
 - wecom：模板卡片补齐 `source` 字段，修复部分客户端“发送成功但不展示”的问题
 - wecom/core：新增 `wecom.template_card_mode`（template_card/both/text）与“回复序号触发 EventKey”文本兜底，解决模板卡片不展示导致菜单无响应
 - core/unraid：支持菜单点击的“文本模式”兜底与文本确认（避免模板卡片不展示时无法继续）
-- unraid：强制更新默认 mutation 修正为 `updateContainer`（适配 Unraid Connect GraphQL 的 DockerMutations）
+- unraid：强制更新 mutation 自动回退尝试 `updateContainer/update`，避免旧配置或版本差异导致失败
 - wecom：增强发送消息/gettoken/update_template_card 的结构化日志；message/send 返回 invaliduser 等不可达信息时输出告警并返回错误
 - app/wecom：回调与请求日志增强（GET/POST 回调增加验签/解密/解析阶段日志；请求日志增加 status_code/response_bytes）
 - config：配置加载日志增强（输出 config 文件 path/sha256/size/mtime；打印脱敏配置摘要用于确认容器挂载是否生效）
