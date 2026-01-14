@@ -15,6 +15,8 @@
 
 > 说明：本项目会对 `base_url` 做规范化（去掉末尾 `/`），并通过 `Authorization: Bearer <token>` 访问需要鉴权的 OpenAPI。
 
+> 注意：部分青龙版本会对 query 参数做严格校验（例如 `/open/crons` 不允许额外参数），多余参数会返回 400；因此本项目不再在请求中附带 `t` 时间戳参数。
+
 ---
 
 ## 2. 通用返回结构（Envelope）
@@ -46,7 +48,6 @@
 - Query:
   - `client_id`
   - `client_secret`
-  - `t`: 秒级时间戳（本项目会附带，减少缓存干扰）
 
 **响应 data**
 - `token`: access token
@@ -77,7 +78,6 @@
   - `searchValue`（可选）
   - `page`（可选，默认 1）
   - `size`（可选，默认 20）
-  - `t`（秒级时间戳）
 
 **响应 data**
 ```json
@@ -94,7 +94,6 @@
 **请求**
 - Method: `GET`
 - Path: `/open/crons/{id}`
-- Query: `t`（秒级时间戳）
 
 ### 4.3 运行 / 启用 / 禁用任务
 
@@ -114,7 +113,6 @@
 **请求**
 - Method: `GET`
 - Path: `/open/crons/{id}/log`
-- Query: `t`（秒级时间戳）
 
 **响应 data**
 - 字符串日志内容（本项目会做长度截断后回显到企业微信）
@@ -130,8 +128,7 @@
 ```bash
 curl -sG 'http://qinglong-host:5700/open/auth/token' \
   --data-urlencode 'client_id=YOUR_CLIENT_ID' \
-  --data-urlencode 'client_secret=YOUR_CLIENT_SECRET' \
-  --data-urlencode "t=$(date +%s)"
+  --data-urlencode 'client_secret=YOUR_CLIENT_SECRET'
 ```
 
 ### 5.2 列表 / 搜索任务
@@ -141,8 +138,7 @@ curl -sG 'http://qinglong-host:5700/open/crons' \
   -H 'Authorization: Bearer YOUR_TOKEN' \
   --data-urlencode 'searchValue=jd' \
   --data-urlencode 'page=1' \
-  --data-urlencode 'size=20' \
-  --data-urlencode "t=$(date +%s)"
+  --data-urlencode 'size=20'
 ```
 
 ### 5.3 运行任务
@@ -158,7 +154,5 @@ curl -sX PUT 'http://qinglong-host:5700/open/crons/run' \
 
 ```bash
 curl -sG 'http://qinglong-host:5700/open/crons/123/log' \
-  -H 'Authorization: Bearer YOUR_TOKEN' \
-  --data-urlencode "t=$(date +%s)"
+  -H 'Authorization: Bearer YOUR_TOKEN'
 ```
-

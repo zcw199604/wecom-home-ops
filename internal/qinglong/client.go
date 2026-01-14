@@ -99,7 +99,6 @@ func (c *Client) ListCrons(ctx context.Context, params ListCronsParams) (CronPag
 	if params.Size > 0 {
 		q.Set("size", strconv.Itoa(params.Size))
 	}
-	q.Set("t", strconv.FormatInt(time.Now().Unix(), 10))
 
 	var out CronPage
 	if err := c.do(ctx, http.MethodGet, "/open/crons", q, nil, &out, true); err != nil {
@@ -113,11 +112,8 @@ func (c *Client) GetCron(ctx context.Context, id int) (Cron, error) {
 		return Cron{}, errors.New("cron id 不合法")
 	}
 
-	q := url.Values{}
-	q.Set("t", strconv.FormatInt(time.Now().Unix(), 10))
-
 	var out Cron
-	if err := c.do(ctx, http.MethodGet, "/open/crons/"+strconv.Itoa(id), q, nil, &out, true); err != nil {
+	if err := c.do(ctx, http.MethodGet, "/open/crons/"+strconv.Itoa(id), nil, nil, &out, true); err != nil {
 		return Cron{}, err
 	}
 	return out, nil
@@ -139,11 +135,9 @@ func (c *Client) GetCronLog(ctx context.Context, id int) (string, error) {
 	if id <= 0 {
 		return "", errors.New("cron id 不合法")
 	}
-	q := url.Values{}
-	q.Set("t", strconv.FormatInt(time.Now().Unix(), 10))
 
 	var out string
-	if err := c.do(ctx, http.MethodGet, "/open/crons/"+strconv.Itoa(id)+"/log", q, nil, &out, true); err != nil {
+	if err := c.do(ctx, http.MethodGet, "/open/crons/"+strconv.Itoa(id)+"/log", nil, nil, &out, true); err != nil {
 		return "", err
 	}
 	return out, nil
@@ -266,7 +260,6 @@ func (c *Client) getToken(ctx context.Context) (string, time.Time, error) {
 		q := url.Values{}
 		q.Set("client_id", c.cfg.ClientID)
 		q.Set("client_secret", c.cfg.ClientSecret)
-		q.Set("t", strconv.FormatInt(time.Now().Unix(), 10))
 
 		var out tokenResponse
 		if err := c.do(ctx, http.MethodGet, "/open/auth/token", q, nil, &out, false); err != nil {

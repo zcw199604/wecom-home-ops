@@ -18,6 +18,7 @@
 - 企业微信：消费 ResponseCode 调用 update_template_card，将模板卡片按钮更新为不可点击状态
 - 文档：补充青龙 OpenAPI 调用方式与排障示例
 - 文档：同步青龙官方文档快照（README/LICENSE）并生成官方接口清单
+- 文档：补充青龙在微信/不支持模板卡片客户端的文本菜单交互说明
 - 配置：新增 `server.http_client_timeout` / `server.read_header_timeout` / `core.state_ttl`，支持按环境调整
 - 测试：补齐 Unraid/Qinglong/WeCom 交互与边界的详细单元测试
 
@@ -29,6 +30,7 @@
 - wecom/core：新增 `wecom.template_card_mode`（template_card/both/text）与“回复序号触发 EventKey”文本兜底，解决模板卡片不展示导致菜单无响应
 - core/unraid：支持菜单点击的“文本模式”兜底与文本确认（避免模板卡片不展示时无法继续）
 - unraid：强制更新 mutation 回退识别增强（兼容 GraphQL 错误转义差异），自动回退尝试 `updateContainer/update`
+- qinglong：移除 OpenAPI 请求中的 `t` 时间戳 query，修复部分版本参数校验导致任务列表 400 的问题
 - wecom：增强发送消息/gettoken/update_template_card 的结构化日志；message/send 返回 invaliduser 等不可达信息时输出告警并返回错误
 - app/wecom：回调与请求日志增强（GET/POST 回调增加验签/解密/解析阶段日志；请求日志增加 status_code/response_bytes）
 - config：配置加载日志增强（输出 config 文件 path/sha256/size/mtime；打印脱敏配置摘要用于确认容器挂载是否生效）

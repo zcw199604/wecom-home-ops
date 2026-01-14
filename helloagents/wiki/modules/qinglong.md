@@ -41,6 +41,12 @@
 - 本地缓存 token 与过期时间
 - 并发场景使用 singleflight 合并刷新请求，避免 token 过期时并发打满上游
 
+### 需求: 文本交互兼容（微信/不支持模板卡片按钮的客户端）
+**模块:** qinglong
+当客户端无法操作模板卡片按钮（例如在微信中使用）时，仍需可用的“纯文本”交互路径：
+- 在 `config.yaml` 中设置 `wecom.template_card_mode: both`（卡片+文本）或 `text`（仅文本）
+- 交互方式：按提示 **回复序号**，映射到同等 `EventKey` 触发后续流程
+
 ## API接口
 本模块不直接对外提供 HTTP API，通过内部接口供 core 调用；对青龙侧通过 OpenAPI 发起 HTTP 请求（如 `/open/auth/token`、`/open/crons` 等）。
 
@@ -64,4 +70,5 @@
 
 ## 变更历史
 - [202601121219_wecom_service_framework](../../history/2026-01/202601121219_wecom_service_framework/) - 企业微信多服务框架 + 青龙(QL)对接
+- [202601141231_qinglong_wechat_text](../../history/2026-01/202601141231_qinglong_wechat_text/) - 微信文本菜单交互指引 + 任务列表 400 修复
 - 2026-01-12: OpenAPI token 刷新引入 singleflight，抑制并发刷新击穿

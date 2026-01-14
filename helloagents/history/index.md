@@ -27,6 +27,7 @@
 | 202601131356 | wecom_custom_menu | 功能 | ✅已完成 | [202601131356_wecom_custom_menu](2026-01/202601131356_wecom_custom_menu/) |
 | 202601131512 | startup_notify_wecom | 功能 | ✅已完成 | [202601131512_startup_notify_wecom](2026-01/202601131512_startup_notify_wecom/) |
 | 202601141207 | unraid_force_update_compat | 修复 | ✅已完成 | [202601141207_unraid_force_update_compat](2026-01/202601141207_unraid_force_update_compat/) |
+| 202601141231 | qinglong_wechat_text | 修复 | ✅已完成 | [202601141231_qinglong_wechat_text](2026-01/202601141231_qinglong_wechat_text/) |
 
 ---
 
@@ -53,3 +54,4 @@
 - [202601131356_wecom_custom_menu](2026-01/202601131356_wecom_custom_menu/) - 企业微信应用自定义菜单（底部菜单）同步 + CLICK 事件路由 + 通用命令
 - [202601131512_startup_notify_wecom](2026-01/202601131512_startup_notify_wecom/) - 启动成功后推送企业微信应用消息（诊断信息）
 - [202601141207_unraid_force_update_compat](2026-01/202601141207_unraid_force_update_compat/) - Unraid 强制更新回退兼容（错误转义差异）
+- [202601141231_qinglong_wechat_text](2026-01/202601141231_qinglong_wechat_text/) - 青龙在微信文本菜单交互 + 任务列表 400 修复
