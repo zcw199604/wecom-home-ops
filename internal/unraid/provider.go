@@ -66,23 +66,14 @@ func (p *Provider) HandleText(ctx context.Context, userID, content string) (bool
 		}
 		state.Action = action
 
-		switch action {
-		case core.ActionUnraidViewSystemStats, core.ActionUnraidViewSystemStatsDetail:
-			state.Step = ""
-			state.Action = ""
-			state.ContainerName = ""
-			p.state.Set(userID, state)
-			return true, p.execViewAndReply(ctx, userID, action, "", 0)
-		default:
-			state.Step = core.StepAwaitingContainerName
-			p.state.Set(userID, state)
+		state.Step = core.StepAwaitingContainerName
+		p.state.Set(userID, state)
 
-			prompt := fmt.Sprintf("已选择动作：%s\n请输入容器名：", action.DisplayName())
-			if action == core.ActionUnraidViewLogs {
-				prompt = fmt.Sprintf("已选择动作：%s\n请输入：容器名 [行数]（默认%d，最大%d）：", action.DisplayName(), defaultLogTail, maxLogTail)
-			}
-			return true, p.wecom.SendText(ctx, wecom.TextMessage{ToUser: userID, Content: prompt})
+		prompt := fmt.Sprintf("已选择动作：%s\n请输入容器名：", action.DisplayName())
+		if action == core.ActionUnraidViewLogs {
+			prompt = fmt.Sprintf("已选择动作：%s\n请输入：容器名 [行数]（默认%d，最大%d）：", action.DisplayName(), defaultLogTail, maxLogTail)
 		}
+		return true, p.wecom.SendText(ctx, wecom.TextMessage{ToUser: userID, Content: prompt})
 
 	case core.StepAwaitingUnraidOpsAction:
 		action, ok := parseUnraidOpsAction(content)
@@ -98,6 +89,21 @@ func (p *Provider) HandleText(ctx context.Context, userID, content string) (bool
 
 		prompt := fmt.Sprintf("已选择动作：%s\n请输入容器名：", action.DisplayName())
 		return true, p.wecom.SendText(ctx, wecom.TextMessage{ToUser: userID, Content: prompt})
+
+	case core.StepAwaitingUnraidSystemAction:
+		action, ok := parseUnraidSystemAction(content)
+		if !ok {
+			return true, p.wecom.SendText(ctx, wecom.TextMessage{
+				ToUser:  userID,
+				Content: unraidSystemTextMenu(),
+			})
+		}
+
+		state.Step = ""
+		state.Action = ""
+		state.ContainerName = ""
+		p.state.Set(userID, state)
+		return true, p.execViewAndReply(ctx, userID, action, "", 0)
 
 	case core.StepAwaitingContainerName:
 		if state.Action == core.ActionUnraidViewSystemStats || state.Action == core.ActionUnraidViewSystemStatsDetail {
@@ -170,12 +176,19 @@ func (p *Provider) HandleEvent(ctx context.Context, userID string, msg wecom.Inc
 		}
 		p.state.Set(userID, core.ConversationState{ServiceKey: p.Key()})
 		return true, p.wecom.SendTemplateCard(ctx, wecom.TemplateCardMessage{ToUser: userID, Card: wecom.NewUnraidViewCard()})
+	case wecom.EventKeyUnraidMenuSystem:
+		if event == "click" {
+			p.state.Set(userID, core.ConversationState{ServiceKey: p.Key(), Step: core.StepAwaitingUnraidSystemAction})
+			return true, p.wecom.SendText(ctx, wecom.TextMessage{ToUser: userID, Content: unraidSystemTextMenu()})
+		}
+		p.state.Set(userID, core.ConversationState{ServiceKey: p.Key()})
+		return true, p.wecom.SendTemplateCard(ctx, wecom.TemplateCardMessage{ToUser: userID, Card: wecom.NewUnraidSystemCard()})
 	case wecom.EventKeyUnraidBackToMenu:
 		if event == "click" {
 			p.state.Set(userID, core.ConversationState{ServiceKey: p.Key()})
 			return true, p.wecom.SendText(ctx, wecom.TextMessage{
 				ToUser:  userID,
-				Content: "已返回。可通过底部菜单选择“容器操作/容器查看”，或直接输入“容器”。",
+				Content: "已返回。可通过底部菜单选择“容器操作/容器查看/系统监控”，或直接输入“容器”。",
 			})
 		}
 		p.state.Set(userID, core.ConversationState{ServiceKey: p.Key()})
@@ -209,9 +222,15 @@ func (p *Provider) HandleEvent(ctx context.Context, userID string, msg wecom.Inc
 func unraidViewTextMenu() string {
 	return "Unraid 容器查看（文本模式）\n" +
 		"1. 查看状态\n" +
-		"2. 系统资源概览\n" +
-		"3. 系统资源详情\n" +
-		"4. 查看日志\n" +
+		"2. 查看日志\n" +
+		"\n提示：系统资源请从“系统监控”进入。\n" +
+		"\n回复序号选择。"
+}
+
+func unraidSystemTextMenu() string {
+	return "Unraid 系统监控（文本模式）\n" +
+		"1. 系统资源概览\n" +
+		"2. 系统资源详情\n" +
 		"\n回复序号选择。"
 }
 
@@ -228,12 +247,20 @@ func parseUnraidViewAction(input string) (core.Action, bool) {
 	switch s {
 	case "1", "状态", "查看状态", "status":
 		return core.ActionUnraidViewStatus, true
-	case "2", "概览", "系统资源概览", "系统概览", "sys":
-		return core.ActionUnraidViewSystemStats, true
-	case "3", "详情", "系统资源详情", "系统详情", "detail":
-		return core.ActionUnraidViewSystemStatsDetail, true
-	case "4", "日志", "查看日志", "logs":
+	case "2", "日志", "查看日志", "logs":
 		return core.ActionUnraidViewLogs, true
+	default:
+		return "", false
+	}
+}
+
+func parseUnraidSystemAction(input string) (core.Action, bool) {
+	s := strings.ToLower(strings.TrimSpace(input))
+	switch s {
+	case "1", "概览", "系统资源概览", "系统概览", "sys":
+		return core.ActionUnraidViewSystemStats, true
+	case "2", "详情", "系统资源详情", "系统详情", "detail":
+		return core.ActionUnraidViewSystemStatsDetail, true
 	default:
 		return "", false
 	}

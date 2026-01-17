@@ -20,6 +20,8 @@ const (
 	StepAwaitingUnraidOpsAction Step = "awaiting_unraid_ops_action"
 	// StepAwaitingUnraidViewAction 表示处于 Unraid “容器查看”菜单选择阶段（文本模式）。
 	StepAwaitingUnraidViewAction Step = "awaiting_unraid_view_action"
+	// StepAwaitingUnraidSystemAction 表示处于 Unraid “系统监控”菜单选择阶段（文本模式）。
+	StepAwaitingUnraidSystemAction Step = "awaiting_unraid_system_action"
 )
 
 type Action string

@@ -31,6 +31,7 @@ const (
 
 	EventKeyUnraidMenuOps         = "unraid.menu.ops"
 	EventKeyUnraidMenuView        = "unraid.menu.view"
+	EventKeyUnraidMenuSystem      = "unraid.menu.system"
 	EventKeyUnraidBackToMenu      = "unraid.menu.back"
 	EventKeyUnraidRestart         = "unraid.action.restart"
 	EventKeyUnraidStop            = "unraid.action.stop"
@@ -96,6 +97,7 @@ func DefaultMenu() Menu {
 					{Type: "click", Name: "进入菜单", Key: EventKeyServiceSelectPrefix + "unraid"},
 					{Type: "click", Name: "容器操作", Key: EventKeyUnraidMenuOps},
 					{Type: "click", Name: "容器查看", Key: EventKeyUnraidMenuView},
+					{Type: "click", Name: "系统监控", Key: EventKeyUnraidMenuSystem},
 				},
 			},
 			{
@@ -307,6 +309,11 @@ func NewUnraidEntryCard() TemplateCard {
 				"style": 2,
 				"key":   EventKeyUnraidMenuView,
 			},
+			{
+				"text":  "系统监控",
+				"style": 2,
+				"key":   EventKeyUnraidMenuSystem,
+			},
 		},
 	}
 	return applyDefaultSource(card)
@@ -362,7 +369,35 @@ func NewUnraidViewCard() TemplateCard {
 				"key":   EventKeyUnraidViewStatus,
 			},
 			{
-				"text":  "系统资源",
+				"text":  "查看日志",
+				"style": 2,
+				"key":   EventKeyUnraidViewLogs,
+			},
+			{
+				"text":  "系统监控",
+				"style": 1,
+				"key":   EventKeyUnraidMenuSystem,
+			},
+			{
+				"text":  "返回菜单",
+				"style": 1,
+				"key":   EventKeyUnraidBackToMenu,
+			},
+		},
+	}
+	return applyDefaultSource(card)
+}
+
+func NewUnraidSystemCard() TemplateCard {
+	card := TemplateCard{
+		"card_type": "button_interaction",
+		"main_title": map[string]interface{}{
+			"title": "Unraid 系统监控",
+			"desc":  "请选择信息类型",
+		},
+		"button_list": []map[string]interface{}{
+			{
+				"text":  "系统资源概览",
 				"style": 1,
 				"key":   EventKeyUnraidViewSystemStats,
 			},
@@ -370,11 +405,6 @@ func NewUnraidViewCard() TemplateCard {
 				"text":  "系统资源详情",
 				"style": 2,
 				"key":   EventKeyUnraidViewSystemStatsDetail,
-			},
-			{
-				"text":  "查看日志",
-				"style": 2,
-				"key":   EventKeyUnraidViewLogs,
 			},
 			{
 				"text":  "返回菜单",

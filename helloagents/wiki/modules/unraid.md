@@ -19,17 +19,20 @@
   - 说明：优先使用 Unraid GraphQL 提供相应 mutation；代码会自动回退尝试 `updateContainer(id: PrefixedID!)` 与 `update(id: PrefixedID!)`，如仍不一致再通过配置覆盖（见下文）
   - 兜底：当目标 Unraid 的 `DockerMutations` 不提供更新相关 mutation（GraphQL 校验错误）时，可启用 WebGUI StartCommand.php 兜底执行 `update_container <name>`（需配置 csrf_token，可能需要 Cookie）
 
-### 需求: 容器查看（状态/资源/日志）
+### 需求: 容器查看（状态/日志）
 **模块:** unraid
 对指定容器查看：
 - 状态（state/status）与运行时长（从 `status` 字符串解析，如 `Up 3 hours`）
-- 系统资源（资源概览/资源详情）
-  - CPU：使用 `metrics.cpu.percentTotal`（详情额外展示 per-CPU 前 8 个核）
-  - 内存：概览展示使用 `effective used = total - available` 的口径；详情同时保留 raw used 便于排查
-  - 网络：可选展示“容器累计网络 IO”（汇总所有容器 `stats.netIO` 的 rx/tx；若目标 schema/config 不支持则自动省略）
-  - 输出：中文标签，优先把关键指标放在前面，便于微信端快速判读
-  - 5 分钟均值：暂不实现（如需要需在客户端侧采样聚合）
 - 最新日志（默认 50 行，支持指定行数；输出有长度截断）
+
+### 需求: 系统监控（系统资源概览/详情）
+**模块:** unraid
+查看主机系统资源（入口位于企业微信 Unraid 菜单的“系统监控”，不在“容器查看”中展示）：
+- CPU：使用 `metrics.cpu.percentTotal`（详情额外展示 per-CPU 前 8 个核）
+- 内存：概览展示使用 `effective used = total - available` 的口径；详情同时保留 raw used 便于排查
+- 网络：可选展示“容器累计网络 IO”（汇总所有容器 `stats.netIO` 的 rx/tx；若目标 schema/config 不支持则自动省略）
+- 输出：中文标签，优先把关键指标放在前面，便于微信端快速判读
+- 5 分钟均值：暂不实现（如需要需在客户端侧采样聚合）
 
 #### 数据来源与兼容策略
 - **状态/运行时长:**
@@ -77,6 +80,7 @@ MVP 使用 Unraid Connect 插件提供的 GraphQL API（`/graphql` + `x-api-key`
 - 2026-01-14: 强制更新回退识别增强，兼容 GraphQL 错误转义差异，避免未触发回退
 - 2026-01-14: 强制更新新增 WebGUI StartCommand.php 兜底（update_container）
 - 2026-01-17: 系统资源：内存已用按 total-available 口径展示，并补充容器累计网络 IO（stats.netIO 汇总）
+- 2026-01-17: 菜单：新增“系统监控”入口，系统资源从“容器查看”迁移
 - [202601141207_unraid_force_update_compat](../../history/2026-01/202601141207_unraid_force_update_compat/) - 强制更新回退兼容（错误转义差异）
 - [202601141334_unraid_force_update_webgui_fallback](../../history/2026-01/202601141334_unraid_force_update_webgui_fallback/) - 强制更新 WebGUI 兜底（StartCommand.php update_container）
 - [202601121216_unraid_container_inspect](../../history/2026-01/202601121216_unraid_container_inspect/) - 容器查看：状态/运行时长/资源使用/最新日志（按 GraphQL 能力探测）

@@ -33,6 +33,7 @@
 | 202601141432 | unraid_schema_snapshot | 文档 | ✅已完成 | [202601141432_unraid_schema_snapshot](2026-01/202601141432_unraid_schema_snapshot/) |
 | 202601170026 | unraid_system_metrics | 变更 | ✅已完成 | [202601170026_unraid_system_metrics](2026-01/202601170026_unraid_system_metrics/) |
 | 202601170046 | unraid_metrics_output_i18n | 变更 | ✅已完成 | [202601170046_unraid_metrics_output_i18n](2026-01/202601170046_unraid_metrics_output_i18n/) |
+| 202601170102 | unraid_system_menu | 变更 | ✅已完成 | [202601170102_unraid_system_menu](2026-01/202601170102_unraid_system_menu/) |
 
 ---
 
@@ -65,3 +66,4 @@
 - [202601141432_unraid_schema_snapshot](2026-01/202601141432_unraid_schema_snapshot/) - 目标 Unraid 实例（10.10.10.100）GraphQL schema 摘要入库
 - [202601170026_unraid_system_metrics](2026-01/202601170026_unraid_system_metrics/) - 系统资源：内存已用口径调整 + 容器累计网络 IO
 - [202601170046_unraid_metrics_output_i18n](2026-01/202601170046_unraid_metrics_output_i18n/) - 系统资源输出改为中文易读格式
+- [202601170102_unraid_system_menu](2026-01/202601170102_unraid_system_menu/) - 新增“系统监控”入口并迁移系统资源菜单
