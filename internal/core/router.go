@@ -316,6 +316,11 @@ func (r *Router) handleEvent(ctx context.Context, userID string, msg wecom.Incom
 			return r.sendServiceUnavailable(ctx, userID, "qinglong")
 		}
 	}
+	if strings.HasPrefix(key, "pve.") {
+		if _, ok := r.providers["pve"]; !ok {
+			return r.sendServiceUnavailable(ctx, userID, "pve")
+		}
+	}
 
 	if serviceKey := r.providerKeyFromEventKey(key); serviceKey != "" {
 		p := r.providers[serviceKey]
@@ -489,6 +494,8 @@ func (r *Router) sendServiceUnavailable(ctx context.Context, userID string, serv
 		msg = "Unraid 服务未启用：请在 config.yaml 配置 unraid.endpoint 与 unraid.api_key 后重启服务。"
 	case "qinglong":
 		msg = "青龙(QL) 服务未启用：请在 config.yaml 配置 qinglong.instances 后重启服务。"
+	case "pve":
+		msg = "PVE 服务未启用：请在 config.yaml 配置 pve.instances 后重启服务。"
 	}
 	return r.WeCom.SendText(ctx, wecom.TextMessage{ToUser: userID, Content: msg})
 }

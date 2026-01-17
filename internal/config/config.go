@@ -22,6 +22,7 @@ type Config struct {
 	WeCom    WeComConfig    `yaml:"wecom"`
 	Unraid   UnraidConfig   `yaml:"unraid"`
 	Qinglong QinglongConfig `yaml:"qinglong"`
+	PVE      PVEConfig      `yaml:"pve"`
 	Auth     AuthConfig     `yaml:"auth"`
 }
 
@@ -138,11 +139,40 @@ type QinglongInstance struct {
 	ClientSecret string `yaml:"client_secret"`
 }
 
+type PVEConfig struct {
+	Instances []PVEInstance  `yaml:"instances"`
+	Alert     PVEAlertConfig `yaml:"alert"`
+}
+
+type PVEInstance struct {
+	ID                 string `yaml:"id"`
+	Name               string `yaml:"name"`
+	BaseURL            string `yaml:"base_url"`
+	APIToken           string `yaml:"api_token"`
+	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
+}
+
+type PVEAlertConfig struct {
+	Enabled *bool `yaml:"enabled"`
+
+	// Interval 为告警轮询间隔（建议 1m~5m）。
+	Interval Duration `yaml:"interval"`
+	// Cooldown 为同类告警的冷却时间（避免重复刷屏）。
+	Cooldown Duration `yaml:"cooldown"`
+	// MuteFor 为“静默告警”默认持续时间（通过企业微信菜单触发）。
+	MuteFor Duration `yaml:"mute_for"`
+
+	CPUUsageThreshold     float64 `yaml:"cpu_usage_threshold"`
+	MemUsageThreshold     float64 `yaml:"mem_usage_threshold"`
+	StorageUsageThreshold float64 `yaml:"storage_usage_threshold"`
+}
+
 type AuthConfig struct {
 	AllowedUserIDs []string `yaml:"allowed_userids"`
 }
 
 var qinglongInstanceIDPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,31}$`)
+var pveInstanceIDPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,31}$`)
 var graphqlIdentifierPattern = regexp.MustCompile(`^[_A-Za-z][_0-9A-Za-z]*$`)
 
 func Load(path string) (Config, error) {
@@ -205,6 +235,9 @@ func Load(path string) (Config, error) {
 
 		"unraid.enabled", strings.TrimSpace(cfg.Unraid.Endpoint) != "" && strings.TrimSpace(cfg.Unraid.APIKey) != "",
 		"qinglong.instances_count", len(cfg.Qinglong.Instances),
+		"pve.instances_count", len(cfg.PVE.Instances),
+		"pve.enabled", len(cfg.PVE.Instances) > 0,
+		"pve.alert_enabled", len(cfg.PVE.Instances) > 0 && cfg.PVE.Alert.Enabled != nil && *cfg.PVE.Alert.Enabled,
 	)
 
 	return cfg, nil
@@ -259,6 +292,29 @@ func applyDefaults(cfg *Config) {
 	}
 	if cfg.Unraid.ForceUpdateReturnFields == nil {
 		cfg.Unraid.ForceUpdateReturnFields = []string{"__typename"}
+	}
+
+	if cfg.PVE.Alert.Enabled == nil {
+		v := true
+		cfg.PVE.Alert.Enabled = &v
+	}
+	if cfg.PVE.Alert.Interval == 0 {
+		cfg.PVE.Alert.Interval = Duration(2 * time.Minute)
+	}
+	if cfg.PVE.Alert.Cooldown == 0 {
+		cfg.PVE.Alert.Cooldown = Duration(10 * time.Minute)
+	}
+	if cfg.PVE.Alert.MuteFor == 0 {
+		cfg.PVE.Alert.MuteFor = Duration(30 * time.Minute)
+	}
+	if cfg.PVE.Alert.CPUUsageThreshold == 0 {
+		cfg.PVE.Alert.CPUUsageThreshold = 90
+	}
+	if cfg.PVE.Alert.MemUsageThreshold == 0 {
+		cfg.PVE.Alert.MemUsageThreshold = 90
+	}
+	if cfg.PVE.Alert.StorageUsageThreshold == 0 {
+		cfg.PVE.Alert.StorageUsageThreshold = 90
 	}
 }
 
@@ -415,13 +471,69 @@ func validate(cfg Config) error {
 		}
 	}
 
+	if len(cfg.PVE.Instances) > 0 {
+		seen := make(map[string]struct{})
+		for i, ins := range cfg.PVE.Instances {
+			prefix := fmt.Sprintf("pve.instances[%d].", i)
+			if strings.TrimSpace(ins.ID) == "" {
+				problems = append(problems, prefix+"id 不能为空")
+			} else {
+				if !pveInstanceIDPattern.MatchString(ins.ID) {
+					problems = append(problems, prefix+"id 不合法（仅允许字母数字及 _ -，长度≤32，且首字符为字母数字）")
+				}
+				if _, ok := seen[ins.ID]; ok {
+					problems = append(problems, prefix+"id 重复")
+				}
+				seen[ins.ID] = struct{}{}
+			}
+			if strings.TrimSpace(ins.Name) == "" {
+				problems = append(problems, prefix+"name 不能为空")
+			}
+			if strings.TrimSpace(ins.BaseURL) == "" {
+				problems = append(problems, prefix+"base_url 不能为空")
+			} else {
+				u, err := url.Parse(ins.BaseURL)
+				if err != nil || u.Scheme == "" || u.Host == "" {
+					problems = append(problems, prefix+"base_url 不合法（示例：https://pve.example:8006）")
+				}
+			}
+			if strings.TrimSpace(ins.APIToken) == "" {
+				problems = append(problems, prefix+"api_token 不能为空")
+			}
+		}
+
+		if cfg.PVE.Alert.Enabled == nil {
+			problems = append(problems, "pve.alert.enabled 缺失（请设为 true/false）")
+		} else if *cfg.PVE.Alert.Enabled {
+			if cfg.PVE.Alert.Interval.ToDuration() <= 0 {
+				problems = append(problems, "pve.alert.interval 不能为空且必须为正数（例如 2m）")
+			}
+			if cfg.PVE.Alert.Cooldown.ToDuration() <= 0 {
+				problems = append(problems, "pve.alert.cooldown 不能为空且必须为正数（例如 10m）")
+			}
+			if cfg.PVE.Alert.MuteFor.ToDuration() <= 0 {
+				problems = append(problems, "pve.alert.mute_for 不能为空且必须为正数（例如 30m）")
+			}
+			if cfg.PVE.Alert.CPUUsageThreshold <= 0 || cfg.PVE.Alert.CPUUsageThreshold > 100 {
+				problems = append(problems, "pve.alert.cpu_usage_threshold 不合法（范围 1~100）")
+			}
+			if cfg.PVE.Alert.MemUsageThreshold <= 0 || cfg.PVE.Alert.MemUsageThreshold > 100 {
+				problems = append(problems, "pve.alert.mem_usage_threshold 不合法（范围 1~100）")
+			}
+			if cfg.PVE.Alert.StorageUsageThreshold <= 0 || cfg.PVE.Alert.StorageUsageThreshold > 100 {
+				problems = append(problems, "pve.alert.storage_usage_threshold 不合法（范围 1~100）")
+			}
+		}
+	}
+
 	if len(cfg.Auth.AllowedUserIDs) == 0 {
 		problems = append(problems, "auth.allowed_userids 不能为空（MVP 仅支持白名单）")
 	}
 
 	hasQinglong := len(cfg.Qinglong.Instances) > 0
-	if !hasUnraid && !hasQinglong {
-		problems = append(problems, "至少配置一个后端服务：unraid 或 qinglong.instances")
+	hasPVE := len(cfg.PVE.Instances) > 0
+	if !hasUnraid && !hasQinglong && !hasPVE {
+		problems = append(problems, "至少配置一个后端服务：unraid 或 qinglong.instances 或 pve.instances")
 	}
 
 	if len(problems) > 0 {

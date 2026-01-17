@@ -160,6 +160,28 @@ func TestApplyDefaults(t *testing.T) {
 	if len(cfg.Unraid.ForceUpdateReturnFields) == 0 {
 		t.Fatalf("Unraid.ForceUpdateReturnFields empty, want defaults")
 	}
+
+	if cfg.PVE.Alert.Enabled == nil || !*cfg.PVE.Alert.Enabled {
+		t.Fatalf("PVE.Alert.Enabled = %v, want true", cfg.PVE.Alert.Enabled)
+	}
+	if cfg.PVE.Alert.Interval.ToDuration() != 2*time.Minute {
+		t.Fatalf("PVE.Alert.Interval = %s, want %s", cfg.PVE.Alert.Interval.ToDuration(), 2*time.Minute)
+	}
+	if cfg.PVE.Alert.Cooldown.ToDuration() != 10*time.Minute {
+		t.Fatalf("PVE.Alert.Cooldown = %s, want %s", cfg.PVE.Alert.Cooldown.ToDuration(), 10*time.Minute)
+	}
+	if cfg.PVE.Alert.MuteFor.ToDuration() != 30*time.Minute {
+		t.Fatalf("PVE.Alert.MuteFor = %s, want %s", cfg.PVE.Alert.MuteFor.ToDuration(), 30*time.Minute)
+	}
+	if cfg.PVE.Alert.CPUUsageThreshold != 90 {
+		t.Fatalf("PVE.Alert.CPUUsageThreshold = %v, want %v", cfg.PVE.Alert.CPUUsageThreshold, 90)
+	}
+	if cfg.PVE.Alert.MemUsageThreshold != 90 {
+		t.Fatalf("PVE.Alert.MemUsageThreshold = %v, want %v", cfg.PVE.Alert.MemUsageThreshold, 90)
+	}
+	if cfg.PVE.Alert.StorageUsageThreshold != 90 {
+		t.Fatalf("PVE.Alert.StorageUsageThreshold = %v, want %v", cfg.PVE.Alert.StorageUsageThreshold, 90)
+	}
 }
 
 func TestValidate_UnraidGraphQLConfig(t *testing.T) {
@@ -434,6 +456,47 @@ func TestValidate_AtLeastOneBackendRequired(t *testing.T) {
 
 	if err := validate(cfg); err == nil {
 		t.Fatalf("validate() error = nil, want not nil")
+	}
+}
+
+func TestValidate_PVEAsBackend(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		Server: ServerConfig{
+			ListenAddr:        ":8080",
+			HTTPClientTimeout: Duration(15 * time.Second),
+			ReadHeaderTimeout: Duration(10 * time.Second),
+		},
+		Core: CoreConfig{
+			StateTTL: Duration(30 * time.Minute),
+		},
+		WeCom: WeComConfig{
+			CorpID:         "ww",
+			AgentID:        1,
+			Secret:         "s",
+			Token:          "t",
+			EncodingAESKey: "k",
+			APIBaseURL:     "https://qyapi.weixin.qq.com/cgi-bin",
+		},
+		Auth: AuthConfig{
+			AllowedUserIDs: []string{"u"},
+		},
+		PVE: PVEConfig{
+			Instances: []PVEInstance{
+				{
+					ID:       "home",
+					Name:     "Home",
+					BaseURL:  "https://pve.example:8006",
+					APIToken: "PVEAPIToken=root@pam!t=uuid",
+				},
+			},
+		},
+	}
+	applyDefaults(&cfg)
+
+	if err := validate(cfg); err != nil {
+		t.Fatalf("validate() error: %v", err)
 	}
 }
 

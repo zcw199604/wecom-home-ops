@@ -12,6 +12,7 @@ import (
 
 	"github.com/zcw199604/wecom-home-ops/internal/config"
 	"github.com/zcw199604/wecom-home-ops/internal/core"
+	"github.com/zcw199604/wecom-home-ops/internal/pve"
 	"github.com/zcw199604/wecom-home-ops/internal/qinglong"
 	"github.com/zcw199604/wecom-home-ops/internal/unraid"
 	"github.com/zcw199604/wecom-home-ops/internal/wecom"
@@ -22,6 +23,7 @@ type Server struct {
 	server     *http.Server
 	stateStore *core.StateStore
 	deduper    *wecom.Deduper
+	pveAlerts  *pve.AlertManager
 }
 
 func NewServer(cfg config.Config) (*Server, error) {
@@ -99,6 +101,55 @@ func NewServer(cfg config.Config) (*Server, error) {
 		}))
 	}
 
+	var pveAlerts *pve.AlertManager
+	if len(cfg.PVE.Instances) > 0 {
+		var instances []pve.Instance
+		for _, ins := range cfg.PVE.Instances {
+			client, err := pve.NewClient(pve.ClientConfig{
+				BaseURL:            ins.BaseURL,
+				APIToken:           ins.APIToken,
+				InsecureSkipVerify: ins.InsecureSkipVerify,
+			}, httpClient)
+			if err != nil {
+				return nil, err
+			}
+			instances = append(instances, pve.Instance{
+				ID:     ins.ID,
+				Name:   ins.Name,
+				Client: client,
+			})
+		}
+
+		enabled := cfg.PVE.Alert.Enabled != nil && *cfg.PVE.Alert.Enabled
+		alertCfg := pve.AlertConfig{
+			Enabled: enabled,
+
+			Interval: cfg.PVE.Alert.Interval.ToDuration(),
+			Cooldown: cfg.PVE.Alert.Cooldown.ToDuration(),
+			MuteFor:  cfg.PVE.Alert.MuteFor.ToDuration(),
+
+			CPUUsageThreshold:     cfg.PVE.Alert.CPUUsageThreshold,
+			MemUsageThreshold:     cfg.PVE.Alert.MemUsageThreshold,
+			StorageUsageThreshold: cfg.PVE.Alert.StorageUsageThreshold,
+		}
+
+		pveAlerts = pve.NewAlertManager(pve.AlertManagerDeps{
+			WeCom:     wecomClient,
+			UserIDs:   cfg.Auth.AllowedUserIDs,
+			Instances: instances,
+			Config:    alertCfg,
+		})
+		pveAlerts.Start()
+
+		providers = append(providers, pve.NewProvider(pve.ProviderDeps{
+			WeCom:        wecomSender,
+			State:        stateStore,
+			Instances:    instances,
+			AlertConfig:  alertCfg,
+			Alerts:       pveAlerts,
+		}))
+	}
+
 	router := core.NewRouter(core.RouterDeps{
 		WeCom:         wecomSender,
 		AllowedUserID: make(map[string]struct{}),
@@ -147,6 +198,7 @@ func NewServer(cfg config.Config) (*Server, error) {
 		server:     s,
 		stateStore: stateStore,
 		deduper:    deduper,
+		pveAlerts:  pveAlerts,
 	}, nil
 }
 
@@ -181,6 +233,9 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	}
 	if s.deduper != nil {
 		s.deduper.Close()
+	}
+	if s.pveAlerts != nil {
+		s.pveAlerts.Close()
 	}
 	return err
 }

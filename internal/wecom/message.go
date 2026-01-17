@@ -54,6 +54,28 @@ const (
 	EventKeyQinglongCronDisable          = "qinglong.cron.disable"
 	EventKeyQinglongCronLog              = "qinglong.cron.log"
 
+	EventKeyPVEMenu                 = "pve.menu"
+	EventKeyPVEInstanceSelectPrefix = "pve.instance.select."
+	EventKeyPVEGuestSelectPrefix    = "pve.guest.select."
+
+	EventKeyPVEActionOverview       = "pve.action.overview"
+	EventKeyPVEActionVMMenu         = "pve.action.vm_menu"
+	EventKeyPVEActionLXCMenu        = "pve.action.lxc_menu"
+	EventKeyPVEActionAlertStatus    = "pve.action.alert_status"
+	EventKeyPVEActionAlertMute      = "pve.action.alert_mute"
+	EventKeyPVEActionAlertUnmute    = "pve.action.alert_unmute"
+	EventKeyPVEActionSwitchInstance = "pve.action.switch_instance"
+
+	EventKeyPVEVMStart    = "pve.vm.action.start"
+	EventKeyPVEVMShutdown = "pve.vm.action.shutdown"
+	EventKeyPVEVMReboot   = "pve.vm.action.reboot"
+	EventKeyPVEVMStop     = "pve.vm.action.stop"
+
+	EventKeyPVELXCStart    = "pve.lxc.action.start"
+	EventKeyPVELXCShutdown = "pve.lxc.action.shutdown"
+	EventKeyPVELXCReboot   = "pve.lxc.action.reboot"
+	EventKeyPVELXCStop     = "pve.lxc.action.stop"
+
 	EventKeyConfirm = "core.action.confirm"
 	EventKeyCancel  = "core.action.cancel"
 )
@@ -87,6 +109,7 @@ func DefaultMenu() Menu {
 				Name: "常用",
 				SubButtons: []MenuButton{
 					{Type: "click", Name: "操作菜单", Key: EventKeyCoreMenu},
+					{Type: "click", Name: "PVE", Key: EventKeyServiceSelectPrefix + "pve"},
 					{Type: "click", Name: "自检", Key: EventKeyCoreSelfTest},
 					{Type: "click", Name: "帮助", Key: EventKeyCoreHelp},
 				},
@@ -572,6 +595,205 @@ func NewQinglongCronActionCard(instanceName string, cronID int, cronName string)
 				"key":   EventKeyQinglongMenu,
 			},
 		},
+	}
+	return applyDefaultSource(card)
+}
+
+type PVEInstanceOption struct {
+	ID   string
+	Name string
+}
+
+func NewPVEInstanceSelectCard(instances []PVEInstanceOption) TemplateCard {
+	var buttons []map[string]interface{}
+	for _, ins := range instances {
+		if ins.ID == "" || ins.Name == "" {
+			continue
+		}
+		buttons = append(buttons, map[string]interface{}{
+			"text":  ins.Name,
+			"style": 1,
+			"key":   EventKeyPVEInstanceSelectPrefix + ins.ID,
+		})
+	}
+
+	card := TemplateCard{
+		"card_type": "button_interaction",
+		"main_title": map[string]interface{}{
+			"title": "PVE（Proxmox VE）",
+			"desc":  "请选择实例",
+		},
+		"button_list": buttons,
+	}
+	return applyDefaultSource(card)
+}
+
+type PVEActionCardOptions struct {
+	InstanceName       string
+	AlertDesc          string
+	ShowAlertActions   bool
+	AlertMuted         bool
+	ShowSwitchInstance bool
+}
+
+func NewPVEActionCard(opts PVEActionCardOptions) TemplateCard {
+	var parts []string
+	if strings.TrimSpace(opts.InstanceName) != "" {
+		parts = append(parts, "实例："+strings.TrimSpace(opts.InstanceName))
+	}
+	if strings.TrimSpace(opts.AlertDesc) != "" {
+		parts = append(parts, strings.TrimSpace(opts.AlertDesc))
+	}
+	desc := "请选择动作"
+	if len(parts) > 0 {
+		desc = strings.Join(parts, " | ")
+	}
+
+	var buttons []map[string]interface{}
+	buttons = append(buttons,
+		map[string]interface{}{
+			"text":  "资源概览",
+			"style": 1,
+			"key":   EventKeyPVEActionOverview,
+		},
+		map[string]interface{}{
+			"text":  "VM 管理",
+			"style": 1,
+			"key":   EventKeyPVEActionVMMenu,
+		},
+		map[string]interface{}{
+			"text":  "LXC 管理",
+			"style": 1,
+			"key":   EventKeyPVEActionLXCMenu,
+		},
+	)
+
+	if opts.ShowAlertActions {
+		buttons = append(buttons, map[string]interface{}{
+			"text":  "告警状态",
+			"style": 2,
+			"key":   EventKeyPVEActionAlertStatus,
+		})
+		if opts.AlertMuted {
+			buttons = append(buttons, map[string]interface{}{
+				"text":  "解除静默",
+				"style": 2,
+				"key":   EventKeyPVEActionAlertUnmute,
+			})
+		} else {
+			buttons = append(buttons, map[string]interface{}{
+				"text":  "静默告警",
+				"style": 2,
+				"key":   EventKeyPVEActionAlertMute,
+			})
+		}
+	}
+
+	if opts.ShowSwitchInstance {
+		buttons = append(buttons, map[string]interface{}{
+			"text":  "切换实例",
+			"style": 2,
+			"key":   EventKeyPVEActionSwitchInstance,
+		})
+	}
+
+	card := TemplateCard{
+		"card_type": "button_interaction",
+		"main_title": map[string]interface{}{
+			"title": "PVE（Proxmox VE）",
+			"desc":  desc,
+		},
+		"button_list": buttons,
+	}
+	return applyDefaultSource(card)
+}
+
+func NewPVEVMActionCard(instanceName string) TemplateCard {
+	desc := "请选择动作"
+	if strings.TrimSpace(instanceName) != "" {
+		desc = "实例：" + strings.TrimSpace(instanceName)
+	}
+	card := TemplateCard{
+		"card_type": "button_interaction",
+		"main_title": map[string]interface{}{
+			"title": "PVE VM 管理",
+			"desc":  desc,
+		},
+		"button_list": []map[string]interface{}{
+			{"text": "启动", "style": 1, "key": EventKeyPVEVMStart},
+			{"text": "关机", "style": 2, "key": EventKeyPVEVMShutdown},
+			{"text": "重启", "style": 1, "key": EventKeyPVEVMReboot},
+			{"text": "强制停止", "style": 2, "key": EventKeyPVEVMStop},
+			{"text": "返回菜单", "style": 1, "key": EventKeyPVEMenu},
+		},
+	}
+	return applyDefaultSource(card)
+}
+
+func NewPVELXCActionCard(instanceName string) TemplateCard {
+	desc := "请选择动作"
+	if strings.TrimSpace(instanceName) != "" {
+		desc = "实例：" + strings.TrimSpace(instanceName)
+	}
+	card := TemplateCard{
+		"card_type": "button_interaction",
+		"main_title": map[string]interface{}{
+			"title": "PVE LXC 管理",
+			"desc":  desc,
+		},
+		"button_list": []map[string]interface{}{
+			{"text": "启动", "style": 1, "key": EventKeyPVELXCStart},
+			{"text": "关机", "style": 2, "key": EventKeyPVELXCShutdown},
+			{"text": "重启", "style": 1, "key": EventKeyPVELXCReboot},
+			{"text": "强制停止", "style": 2, "key": EventKeyPVELXCStop},
+			{"text": "返回菜单", "style": 1, "key": EventKeyPVEMenu},
+		},
+	}
+	return applyDefaultSource(card)
+}
+
+type PVEGuestOption struct {
+	Text      string
+	GuestType string
+	VMID      int
+	Node      string
+}
+
+func NewPVEGuestSelectCard(title, instanceName string, guests []PVEGuestOption) TemplateCard {
+	desc := "请选择目标"
+	if strings.TrimSpace(instanceName) != "" {
+		desc = "实例：" + strings.TrimSpace(instanceName)
+	}
+
+	var buttons []map[string]interface{}
+	for _, g := range guests {
+		if strings.TrimSpace(g.GuestType) == "" || g.VMID <= 0 || strings.TrimSpace(g.Node) == "" {
+			continue
+		}
+		text := strings.TrimSpace(g.Text)
+		if text == "" {
+			text = "选择目标"
+		}
+		buttons = append(buttons, map[string]interface{}{
+			"text":  text,
+			"style": 1,
+			"key":   EventKeyPVEGuestSelectPrefix + strings.TrimSpace(g.GuestType) + "." + intToString(g.VMID) + "." + strings.TrimSpace(g.Node),
+		})
+	}
+
+	buttons = append(buttons, map[string]interface{}{
+		"text":  "返回菜单",
+		"style": 2,
+		"key":   EventKeyPVEMenu,
+	})
+
+	card := TemplateCard{
+		"card_type": "button_interaction",
+		"main_title": map[string]interface{}{
+			"title": title,
+			"desc":  desc,
+		},
+		"button_list": buttons,
 	}
 	return applyDefaultSource(card)
 }

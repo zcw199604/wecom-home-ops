@@ -22,6 +22,8 @@
 - 文档：整理上游项目 `s3ppo/unraid_mobile_ui` 的功能与 GraphQL API 使用方式
 - 文档：整理 Unraid 官方 API（GraphQL）文档要点（可用性/鉴权/API key/OIDC/CLI/示例 Query）
 - 文档：整理 PVE（Proxmox VE）官方 API（REST）文档要点（鉴权/API Viewer/pvesh/客户端库）
+- pve：新增 PVE Provider（资源概览、VM/LXC 启动/关机/重启/强制停止、CPU/内存/存储阈值告警轮询 + 冷却/静默）
+- wecom：底部自定义菜单“常用”新增 PVE 入口（同步菜单后生效）
 - 配置：新增 `server.http_client_timeout` / `server.read_header_timeout` / `core.state_ttl`，支持按环境调整
 - 测试：补齐 Unraid/Qinglong/WeCom 交互与边界的详细单元测试
 - unraid：强制更新新增 WebGUI StartCommand.php 兜底（支持 `update_container <name>`；需配置 csrf_token/可选 Cookie）

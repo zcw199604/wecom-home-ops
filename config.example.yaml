@@ -82,3 +82,27 @@ qinglong:
       # 在青龙面板“OpenAPI”里创建应用后获取 client_id/client_secret，并授予 crons 等相关 scopes。
       client_id: "your-client-id"
       client_secret: "your-client-secret"
+
+pve:
+  # 可配置多个 PVE 实例；id 建议使用字母数字/下划线/短横线（用于卡片按钮回调 key）。
+  instances:
+    - id: "home"
+      name: "家里 PVE"
+      # 示例：https://pve.example:8006 （也支持反代前缀，例如 https://gw.example/pve）
+      base_url: "https://pve-host:8006"
+      # PVE API Token（推荐）：Authorization Header 形态为 `PVEAPIToken=USER@REALM!TOKENID=UUID`
+      # 说明：本项目会自动以 `Authorization: <api_token>` 形式发送。
+      api_token: "PVEAPIToken=root@pam!monitoring=aaaaaaaa-bbbb-cccc-dddd-ef0123456789"
+      # PVE 默认是自签证书（https），如未配可信证书可开启（仅建议用于内网/家庭环境）。
+      insecure_skip_verify: true
+
+  alert:
+    enabled: true
+    interval: 2m
+    cooldown: 10m
+    # 通过企业微信菜单触发“静默告警”时的默认持续时间
+    mute_for: 30m
+    # 阈值范围：1~100（百分比）
+    cpu_usage_threshold: 90
+    mem_usage_threshold: 90
+    storage_usage_threshold: 90

@@ -15,6 +15,7 @@ const (
 	StepAwaitingConfirm               Step = "awaiting_confirm"
 	StepAwaitingQinglongSearchKeyword Step = "awaiting_qinglong_search_keyword"
 	StepAwaitingQinglongCronID        Step = "awaiting_qinglong_cron_id"
+	StepAwaitingPVEGuestQuery         Step = "awaiting_pve_guest_query"
 
 	// StepAwaitingUnraidOpsAction 表示处于 Unraid “容器操作”菜单选择阶段（文本模式）。
 	StepAwaitingUnraidOpsAction Step = "awaiting_unraid_ops_action"
@@ -39,6 +40,11 @@ const (
 	ActionQinglongRun     Action = "run"
 	ActionQinglongEnable  Action = "enable"
 	ActionQinglongDisable Action = "disable"
+
+	ActionPVEStart    Action = "pve_start"
+	ActionPVEShutdown Action = "pve_shutdown"
+	ActionPVEReboot   Action = "pve_reboot"
+	ActionPVEStop     Action = "pve_stop"
 )
 
 func ActionFromEventKey(key string) Action {
@@ -84,6 +90,14 @@ func (a Action) DisplayName() string {
 		return "启用"
 	case ActionQinglongDisable:
 		return "禁用"
+	case ActionPVEStart:
+		return "启动"
+	case ActionPVEShutdown:
+		return "关机"
+	case ActionPVEReboot:
+		return "重启"
+	case ActionPVEStop:
+		return "强制停止"
 	default:
 		return "未知动作"
 	}
@@ -92,7 +106,8 @@ func (a Action) DisplayName() string {
 func (a Action) RequiresConfirm() bool {
 	switch a {
 	case ActionUnraidRestart, ActionUnraidStop, ActionUnraidForceUpdate,
-		ActionQinglongRun, ActionQinglongEnable, ActionQinglongDisable:
+		ActionQinglongRun, ActionQinglongEnable, ActionQinglongDisable,
+		ActionPVEStart, ActionPVEShutdown, ActionPVEReboot, ActionPVEStop:
 		return true
 	default:
 		return false
@@ -107,6 +122,10 @@ type ConversationState struct {
 	Action        Action
 	ContainerName string
 	CronID        int
+	PVEGuestType  string
+	PVEGuestID    int
+	PVEGuestName  string
+	PVENode       string
 
 	// PendingButtons 用于模板卡片(button_interaction)的文本兜底：当用户回复“序号”时，映射到对应的 EventKey。
 	PendingButtons []wecom.TemplateCardButton
