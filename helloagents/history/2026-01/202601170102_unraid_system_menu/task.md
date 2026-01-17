@@ -11,4 +11,4 @@
 - [√] 验证：Docker 编译通过
 - [√] 验证：单元测试通过（go test ./...）
 - [√] 迁移方案包至 history/ 并更新 history/index.md
-- [ ] 交付：git commit（中文）并 push
+- [√] 交付：git commit（中文）并 push
