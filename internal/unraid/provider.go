@@ -535,19 +535,26 @@ func formatSecondsCN(seconds int64) string {
 	if seconds <= 0 {
 		return "0 分钟"
 	}
-	if seconds < 60 {
-		return fmt.Sprintf("%d 秒", seconds)
+	days := seconds / (24 * 60 * 60)
+	hours := (seconds % (24 * 60 * 60)) / (60 * 60)
+	minutes := (seconds % (60 * 60)) / 60
+
+	if days > 0 {
+		if hours > 0 {
+			return fmt.Sprintf("%d 天 %d 小时", days, hours)
+		}
+		return fmt.Sprintf("%d 天", days)
 	}
-	minutes := seconds / 60
-	if minutes < 60 {
+	if hours > 0 {
+		if minutes > 0 {
+			return fmt.Sprintf("%d 小时 %d 分钟", hours, minutes)
+		}
+		return fmt.Sprintf("%d 小时", hours)
+	}
+	if minutes > 0 {
 		return fmt.Sprintf("%d 分钟", minutes)
 	}
-	hours := minutes / 60
-	if hours < 24 {
-		return fmt.Sprintf("%d 小时 %d 分钟", hours, minutes%60)
-	}
-	days := hours / 24
-	return fmt.Sprintf("%d 天 %d 小时", days, hours%24)
+	return "不足 1 分钟"
 }
 
 func formatPercent(v float64) string {
