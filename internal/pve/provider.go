@@ -328,7 +328,7 @@ func (p *Provider) HandleConfirm(ctx context.Context, userID string) (bool, erro
 }
 
 func (p *Provider) prepareGuestQuery(ctx context.Context, userID string, state core.ConversationState, guestType GuestType, action core.Action) error {
-	ins, ok := p.instanceFromState(state)
+	_, ok := p.instanceFromState(state)
 	if !ok {
 		return p.OnEnter(ctx, userID)
 	}
@@ -765,4 +765,3 @@ func isValidInstanceID(id string) bool {
 	}
 	return true
 }
-

@@ -160,37 +160,17 @@ func (p *Provider) HandleText(ctx context.Context, userID, content string) (bool
 
 func (p *Provider) HandleEvent(ctx context.Context, userID string, msg wecom.IncomingMessage) (bool, error) {
 	key := strings.TrimSpace(msg.EventKey)
-	event := strings.ToLower(strings.TrimSpace(msg.Event))
 	switch key {
 	case wecom.EventKeyUnraidMenuOps:
-		if event == "click" {
-			p.state.Set(userID, core.ConversationState{ServiceKey: p.Key(), Step: core.StepAwaitingUnraidOpsAction})
-			return true, p.wecom.SendText(ctx, wecom.TextMessage{ToUser: userID, Content: unraidOpsTextMenu()})
-		}
 		p.state.Set(userID, core.ConversationState{ServiceKey: p.Key()})
 		return true, p.wecom.SendTemplateCard(ctx, wecom.TemplateCardMessage{ToUser: userID, Card: wecom.NewUnraidOpsCard()})
 	case wecom.EventKeyUnraidMenuView:
-		if event == "click" {
-			p.state.Set(userID, core.ConversationState{ServiceKey: p.Key(), Step: core.StepAwaitingUnraidViewAction})
-			return true, p.wecom.SendText(ctx, wecom.TextMessage{ToUser: userID, Content: unraidViewTextMenu()})
-		}
 		p.state.Set(userID, core.ConversationState{ServiceKey: p.Key()})
 		return true, p.wecom.SendTemplateCard(ctx, wecom.TemplateCardMessage{ToUser: userID, Card: wecom.NewUnraidViewCard()})
 	case wecom.EventKeyUnraidMenuSystem:
-		if event == "click" {
-			p.state.Set(userID, core.ConversationState{ServiceKey: p.Key(), Step: core.StepAwaitingUnraidSystemAction})
-			return true, p.wecom.SendText(ctx, wecom.TextMessage{ToUser: userID, Content: unraidSystemTextMenu()})
-		}
 		p.state.Set(userID, core.ConversationState{ServiceKey: p.Key()})
 		return true, p.wecom.SendTemplateCard(ctx, wecom.TemplateCardMessage{ToUser: userID, Card: wecom.NewUnraidSystemCard()})
 	case wecom.EventKeyUnraidBackToMenu:
-		if event == "click" {
-			p.state.Set(userID, core.ConversationState{ServiceKey: p.Key()})
-			return true, p.wecom.SendText(ctx, wecom.TextMessage{
-				ToUser:  userID,
-				Content: "已返回。可通过底部菜单选择“容器操作/容器查看/系统监控”，或直接输入“容器”。",
-			})
-		}
 		p.state.Set(userID, core.ConversationState{ServiceKey: p.Key()})
 		return true, p.wecom.SendTemplateCard(ctx, wecom.TemplateCardMessage{ToUser: userID, Card: wecom.NewUnraidEntryCard()})
 

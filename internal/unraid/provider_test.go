@@ -267,7 +267,7 @@ func TestProvider_MenuNavigation_Cards(t *testing.T) {
 	}
 }
 
-func TestProvider_ClickMenuView_FallsBackToTextMenu(t *testing.T) {
+func TestProvider_ClickMenuView_SendsTemplateCard(t *testing.T) {
 	t.Parallel()
 
 	rec := &recordWeCom{}
@@ -290,15 +290,20 @@ func TestProvider_ClickMenuView_FallsBackToTextMenu(t *testing.T) {
 		t.Fatalf("HandleEvent(click menu view) ok=%v err=%v, want ok=true err=nil", ok, err)
 	}
 
-	if got := len(rec.Texts()); got != 1 {
-		t.Fatalf("text message count = %d, want 1", got)
+	if got := len(rec.Texts()); got != 0 {
+		t.Fatalf("text message count = %d, want 0", got)
 	}
-	if got := len(rec.Cards()); got != 0 {
-		t.Fatalf("template card count = %d, want 0", got)
+	if got := len(rec.Cards()); got != 1 {
+		t.Fatalf("template card count = %d, want 1", got)
 	}
 
 	st, ok := store.Get(userID)
-	if !ok || st.ServiceKey != "unraid" || st.Step != core.StepAwaitingUnraidViewAction {
-		t.Fatalf("state = %#v ok=%v, want ServiceKey=unraid Step=awaiting_unraid_view_action", st, ok)
+	if !ok || st.ServiceKey != "unraid" {
+		t.Fatalf("state = %#v ok=%v, want ServiceKey=unraid", st, ok)
+	}
+
+	mainTitle, _ := rec.Cards()[len(rec.Cards())-1].Card["main_title"].(map[string]interface{})
+	if title, _ := mainTitle["title"].(string); title != "Unraid 容器查看" {
+		t.Fatalf("view title = %q, want %q", title, "Unraid 容器查看")
 	}
 }
