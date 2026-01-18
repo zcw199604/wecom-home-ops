@@ -22,9 +22,14 @@
 
 ## CI/CD 与镜像发布
 - **Docker 镜像构建:** `Dockerfile`（多阶段构建，默认入口 `-config /config/config.yaml`）
-- **GitHub Actions:** push 到 `main` 时自动构建并推送 Docker Hub（见 `.github/workflows/dockerhub.yml`）
+- **GitHub Actions:** push 到 `main` 时自动构建并推送 Docker Hub（见 `.github/workflows/dockerhub.yml`）；可选发送企业微信构建成功/失败通知（未配置则自动跳过）
 - **必需 Secrets:**
   - `DOCKERHUB_USERNAME`: Docker Hub 用户名
   - `DOCKERHUB_TOKEN`: Docker Hub Access Token（建议使用 Token 而非密码）
 - **可选 Secrets:**
   - `DOCKERHUB_REPOSITORY`: 完整镜像名（如 `yourname/wecom-home-ops`）；未设置时默认 `DOCKERHUB_USERNAME/<GitHub仓库名>`
+  - `WECHAT_CORP_ID`: 企业微信 CorpID（启用通知用）
+  - `WECHAT_CORP_SECRET`: 企业微信应用 Secret（启用通知用）
+  - `WECHAT_AGENT_ID`: 企业微信应用 AgentId（启用通知用）
+  - `WECHAT_TO_USER`: 接收通知的 userid，多个用 `|` 分隔（如 `zhangsan|lisi`）
+  - `WECHAT_API_URL`: 企业微信 API 地址（可选，默认 `https://qyapi.weixin.qq.com`，用于代理/私有化部署）

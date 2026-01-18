@@ -37,6 +37,7 @@
 | 202601170138 | unraid_system_overview_uptime_ups | 变更 | ✅已完成 | [202601170138_unraid_system_overview_uptime_ups](2026-01/202601170138_unraid_system_overview_uptime_ups/) |
 | 202601170231 | pve_api_kb | 文档 | ✅已完成 | [202601170231_pve_api_kb](2026-01/202601170231_pve_api_kb/) |
 | 202601171251 | pve_wecom | 功能 | ✅已完成 | [202601171251_pve_wecom](2026-01/202601171251_pve_wecom/) |
+| 202601181834 | cicd_wechat_notify | 功能 | ✅已完成 | [202601181834_cicd_wechat_notify](2026-01/202601181834_cicd_wechat_notify/) |
 
 ---
 
@@ -73,3 +74,4 @@
 - [202601170138_unraid_system_overview_uptime_ups](2026-01/202601170138_unraid_system_overview_uptime_ups/) - 系统资源概览补充 Unraid 启动时长与 UPS 信息
 - [202601170231_pve_api_kb](2026-01/202601170231_pve_api_kb/) - PVE（Proxmox VE）官方 API 文档要点入库
 - [202601171251_pve_wecom](2026-01/202601171251_pve_wecom/) - PVE 接入企业微信（资源查询 / VM&LXC 管理 / 告警通知）
+- [202601181834_cicd_wechat_notify](2026-01/202601181834_cicd_wechat_notify/) - GitHub Actions Docker 构建结果企业微信通知（成功/失败）
