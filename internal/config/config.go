@@ -109,9 +109,11 @@ type UnraidConfig struct {
 	Origin              string `yaml:"origin"`
 	ForceUpdateMutation string `yaml:"force_update_mutation"`
 
-	// WebGUI StartCommand.php 兜底（用于 GraphQL 不支持的操作，例如容器更新）。
+	// WebGUI 兜底（用于 GraphQL 不支持/不适合的操作，例如容器更新/重启）。
 	// - command_url 默认可由 endpoint 推导（/graphql → /webGui/include/StartCommand.php）
+	// - events_url 默认可由 endpoint 推导（/graphql → /plugins/dynamix.docker.manager/include/Events.php）
 	WebGUICommandURL string `yaml:"webgui_command_url"`
+	WebGUIEventsURL  string `yaml:"webgui_events_url"`
 	WebGUICSRFToken  string `yaml:"webgui_csrf_token"`
 	WebGUICookie     string `yaml:"webgui_cookie"`
 
@@ -422,15 +424,22 @@ func validate(cfg Config) error {
 
 		hasWebGUIFallback := strings.TrimSpace(cfg.Unraid.WebGUICSRFToken) != "" ||
 			strings.TrimSpace(cfg.Unraid.WebGUICookie) != "" ||
-			strings.TrimSpace(cfg.Unraid.WebGUICommandURL) != ""
+			strings.TrimSpace(cfg.Unraid.WebGUICommandURL) != "" ||
+			strings.TrimSpace(cfg.Unraid.WebGUIEventsURL) != ""
 		if hasWebGUIFallback {
 			if strings.TrimSpace(cfg.Unraid.WebGUICSRFToken) == "" {
-				problems = append(problems, "unraid.webgui_csrf_token 不能为空（启用 WebGUI StartCommand 兜底时必填）")
+				problems = append(problems, "unraid.webgui_csrf_token 不能为空（启用 WebGUI 兜底时必填）")
 			}
 			if strings.TrimSpace(cfg.Unraid.WebGUICommandURL) != "" {
 				u, err := url.Parse(cfg.Unraid.WebGUICommandURL)
 				if err != nil || u.Scheme == "" || u.Host == "" {
 					problems = append(problems, "unraid.webgui_command_url 不合法（示例：http://<ip>/webGui/include/StartCommand.php）")
+				}
+			}
+			if strings.TrimSpace(cfg.Unraid.WebGUIEventsURL) != "" {
+				u, err := url.Parse(cfg.Unraid.WebGUIEventsURL)
+				if err != nil || u.Scheme == "" || u.Host == "" {
+					problems = append(problems, "unraid.webgui_events_url 不合法（示例：http://<ip>/plugins/dynamix.docker.manager/include/Events.php）")
 				}
 			}
 		}

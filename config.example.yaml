@@ -36,14 +36,21 @@ unraid:
   api_key: "your-unraid-api-key"
   origin: "wecom-home-ops"
 
-  # WebGUI StartCommand.php 兜底（用于 GraphQL 不支持的操作，例如容器更新）。
+  # WebGUI 兜底（用于 GraphQL 不支持/不适合的操作，例如容器更新/重启）。
   # 典型抓包形态：
   #   POST http://<ip>/webGui/include/StartCommand.php
   #   Content-Type: application/x-www-form-urlencoded; charset=UTF-8
   #   cmd=update_container+<containerName>&start=0&csrf_token=<token>
   #
+  # 重启容器（WebGUI Events.php）抓包形态：
+  #   POST http://<ip>/plugins/dynamix.docker.manager/include/Events.php
+  #   Content-Type: application/x-www-form-urlencoded; charset=UTF-8
+  #   action=restart&container=<containerId>&csrf_token=<token>
+  #
   # 可选：若你的 endpoint 不是标准的 /graphql（例如反代带前缀），可显式指定 command_url。
   # webgui_command_url: "http://unraid-host/webGui/include/StartCommand.php"
+  # 可选：同上，可显式指定 events_url。
+  # webgui_events_url: "http://unraid-host/plugins/dynamix.docker.manager/include/Events.php"
   # 必填：csrf_token（通常随 WebGUI 登录会话变化；可从页面/抓包获取）
   # webgui_csrf_token: "YOUR_CSRF_TOKEN"
   # 可选：Cookie（当 WebGUI 需要登录鉴权时必填；抓包里复制 Cookie 头即可）

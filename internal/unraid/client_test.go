@@ -408,6 +408,109 @@ func TestClient_ForceUpdate_WebGUIFallback(t *testing.T) {
 	}
 }
 
+func TestClient_Restart_WebGUI(t *testing.T) {
+	t.Parallel()
+
+	var graphQLCalls int32
+	var eventsCalls int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/graphql":
+			atomic.AddInt32(&graphQLCalls, 1)
+			var req graphQLRequest
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			q := req.Query
+			switch {
+			case strings.Contains(q, "docker { containers"):
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"data": map[string]interface{}{
+						"docker": map[string]interface{}{
+							"containers": []map[string]interface{}{
+								{
+									"id":     "docker:55a06c25909b",
+									"names":  []string{"app"},
+									"state":  "running",
+									"status": "Up",
+								},
+							},
+						},
+					},
+				})
+				return
+			default:
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"errors": []map[string]interface{}{
+						{"message": "unexpected graphql request"},
+					},
+				})
+				return
+			}
+
+		case "/plugins/dynamix.docker.manager/include/Events.php":
+			atomic.AddInt32(&eventsCalls, 1)
+			if r.Method != http.MethodPost {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+			if err := r.ParseForm(); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			if got := r.Form.Get("action"); got != "restart" {
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte("bad action"))
+				return
+			}
+			if got := r.Form.Get("container"); got != "55a06c25909b" {
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte("bad container"))
+				return
+			}
+			if got := r.Form.Get("csrf_token"); got != "tok" {
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte("bad csrf"))
+				return
+			}
+			if got := r.Header.Get("Cookie"); got != "a=b" {
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte("bad cookie"))
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"success":true}`))
+			return
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	c := NewClient(ClientConfig{
+		Endpoint:        srv.URL + "/graphql",
+		APIKey:          "k",
+		Origin:          "o",
+		WebGUIEventsURL: srv.URL + "/plugins/dynamix.docker.manager/include/Events.php",
+		WebGUICSRFToken: "tok",
+		WebGUICookie:    "a=b",
+	}, srv.Client())
+
+	if err := c.RestartContainerByName(context.Background(), "app"); err != nil {
+		t.Fatalf("RestartContainerByName() error: %v", err)
+	}
+	if atomic.LoadInt32(&graphQLCalls) != 1 {
+		t.Fatalf("graphql calls = %d, want 1", graphQLCalls)
+	}
+	if atomic.LoadInt32(&eventsCalls) != 1 {
+		t.Fatalf("events calls = %d, want 1", eventsCalls)
+	}
+}
+
 func TestClient_GetContainerStatusStatsLogs(t *testing.T) {
 	t.Parallel()
 

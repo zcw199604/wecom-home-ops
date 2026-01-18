@@ -39,6 +39,7 @@
 | 202601171251 | pve_wecom | 功能 | ✅已完成 | [202601171251_pve_wecom](2026-01/202601171251_pve_wecom/) |
 | 202601181834 | cicd_wechat_notify | 功能 | ✅已完成 | [202601181834_cicd_wechat_notify](2026-01/202601181834_cicd_wechat_notify/) |
 | 202601181902 | wecom_unraid_container_select_card | 修复 | ✅已完成 | [202601181902_wecom_unraid_container_select_card](2026-01/202601181902_wecom_unraid_container_select_card/) |
+| 202601181941 | unraid_restart_webgui | 修复 | ✅已完成 | [202601181941_unraid_restart_webgui](2026-01/202601181941_unraid_restart_webgui/) |
 
 ---
 
@@ -77,3 +78,4 @@
 - [202601171251_pve_wecom](2026-01/202601171251_pve_wecom/) - PVE 接入企业微信（资源查询 / VM&LXC 管理 / 告警通知）
 - [202601181834_cicd_wechat_notify](2026-01/202601181834_cicd_wechat_notify/) - GitHub Actions Docker 构建结果企业微信通知（成功/失败）
 - [202601181902_wecom_unraid_container_select_card](2026-01/202601181902_wecom_unraid_container_select_card/) - 模板卡片模式下容器选择卡片化（Unraid）
+- [202601181941_unraid_restart_webgui](2026-01/202601181941_unraid_restart_webgui/) - Unraid 重启优先走 WebGUI Events.php（action=restart）

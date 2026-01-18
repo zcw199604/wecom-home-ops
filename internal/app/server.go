@@ -55,6 +55,7 @@ func NewServer(cfg config.Config) (*Server, error) {
 			Origin:   cfg.Unraid.Origin,
 
 			WebGUICommandURL: cfg.Unraid.WebGUICommandURL,
+			WebGUIEventsURL:  cfg.Unraid.WebGUIEventsURL,
 			WebGUICSRFToken:  cfg.Unraid.WebGUICSRFToken,
 			WebGUICookie:     cfg.Unraid.WebGUICookie,
 
@@ -142,11 +143,11 @@ func NewServer(cfg config.Config) (*Server, error) {
 		pveAlerts.Start()
 
 		providers = append(providers, pve.NewProvider(pve.ProviderDeps{
-			WeCom:        wecomSender,
-			State:        stateStore,
-			Instances:    instances,
-			AlertConfig:  alertCfg,
-			Alerts:       pveAlerts,
+			WeCom:       wecomSender,
+			State:       stateStore,
+			Instances:   instances,
+			AlertConfig: alertCfg,
+			Alerts:      pveAlerts,
 		}))
 	}
 

@@ -23,6 +23,10 @@
 - 模板卡片模式（`wecom.template_card_mode: template_card|both`）：动作选择后发送“选择容器”卡片，点击容器进入确认卡片（支持分页）。
 - 文本模式（`wecom.template_card_mode: text`）：按提示输入容器名（保留兼容）。
 
+**执行策略（实现层）:**
+- 重启（restart）：当配置了 `unraid.webgui_csrf_token`（可选 `unraid.webgui_cookie` / `unraid.webgui_events_url`）时，优先通过 WebGUI `Events.php` 执行 `action=restart`（内部先用 GraphQL 查询容器 id），避免“stop+start”在自重启场景下中断。
+- 未配置 WebGUI 时：仍使用 GraphQL `stop` + `start` 组合实现重启。
+
 ### 需求: 容器查看（状态/日志）
 **模块:** unraid
 对指定容器查看：
@@ -59,7 +63,7 @@
     - `unraid.logs_field` / `unraid.logs_tail_arg` / `unraid.logs_payload_field`
     - `unraid.stats_field` / `unraid.stats_fields`
     - `unraid.force_update_mutation` / `unraid.force_update_arg` / `unraid.force_update_arg_type` / `unraid.force_update_return_fields`
-    - （可选兜底）`unraid.webgui_csrf_token` / `unraid.webgui_cookie` / `unraid.webgui_command_url`
+    - （可选兜底）`unraid.webgui_csrf_token` / `unraid.webgui_cookie` / `unraid.webgui_command_url` / `unraid.webgui_events_url`
   - 提示：当 GraphQL 返回字段/参数错误时，错误信息会带上可配置项提示，便于快速定位
 
 #### 输出限制

@@ -20,11 +20,13 @@ type ClientConfig struct {
 	APIKey   string
 	Origin   string
 
-	// WebGUI StartCommand 兜底配置（用于 GraphQL 不支持的操作，例如容器更新）。
+	// WebGUI 兜底配置（用于 GraphQL 不支持/不适合的操作）。
 	// - WebGUICommandURL: 例如 http://<ip>/webGui/include/StartCommand.php（默认可从 Endpoint 推导）
-	// - WebGUICSRFToken: 抓包/页面里看到的 csrf_token
+	// - WebGUIEventsURL: 例如 http://<ip>/plugins/dynamix.docker.manager/include/Events.php（默认可从 Endpoint 推导）
+	// - WebGUICSRFToken: 抓包/页面里看到的 csrf_token（通常随登录会话变化）
 	// - WebGUICookie: 可选；如 WebGUI 需要登录，则需提供 Cookie 以通过鉴权
 	WebGUICommandURL string
+	WebGUIEventsURL  string
 	WebGUICSRFToken  string
 	WebGUICookie     string
 
@@ -99,6 +101,9 @@ func applyClientDefaults(cfg *ClientConfig) {
 	if strings.TrimSpace(cfg.WebGUICommandURL) == "" {
 		cfg.WebGUICommandURL = deriveWebGUICommandURL(cfg.Endpoint)
 	}
+	if strings.TrimSpace(cfg.WebGUIEventsURL) == "" {
+		cfg.WebGUIEventsURL = deriveWebGUIEventsURL(cfg.Endpoint)
+	}
 }
 
 type graphQLRequest struct {
@@ -114,6 +119,9 @@ type graphQLResponse struct {
 }
 
 func (c *Client) RestartContainerByName(ctx context.Context, name string) error {
+	if c.canWebGUIEvents() {
+		return c.webGUIRestartContainer(ctx, name)
+	}
 	id, err := c.findContainerIDByName(ctx, name)
 	if err != nil {
 		return err
@@ -152,7 +160,7 @@ func (c *Client) ForceUpdateContainerByName(ctx context.Context, name string) er
 	}
 	if err := c.callDockerForceUpdateMutation(ctx, id); err != nil {
 		if isMaybeUnsupportedGraphQL(err) {
-			if c.canWebGUIForceUpdate() {
+			if c.canWebGUICommand() {
 				if errWeb := c.webGUIUpdateContainer(ctx, name); errWeb != nil {
 					return fmt.Errorf("强制更新失败（GraphQL 不支持）且 WebGUI 兜底失败：%w", errWeb)
 				}
@@ -849,6 +857,26 @@ func deriveWebGUICommandURL(endpoint string) string {
 	return u.String()
 }
 
+func deriveWebGUIEventsURL(endpoint string) string {
+	raw := strings.TrimSpace(endpoint)
+	if raw == "" {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil || strings.TrimSpace(u.Scheme) == "" || strings.TrimSpace(u.Host) == "" {
+		return ""
+	}
+
+	path := strings.TrimSuffix(u.Path, "/")
+	if strings.HasSuffix(path, "/graphql") {
+		path = strings.TrimSuffix(path, "/graphql")
+	}
+	u.Path = strings.TrimSuffix(path, "/") + "/plugins/dynamix.docker.manager/include/Events.php"
+	u.RawQuery = ""
+	u.Fragment = ""
+	return u.String()
+}
+
 func isMaybeUnsupportedGraphQL(err error) bool {
 	if err == nil {
 		return false
@@ -860,8 +888,20 @@ func isMaybeUnsupportedGraphQL(err error) bool {
 		strings.HasPrefix(msg, "graphql error:")
 }
 
-func (c *Client) canWebGUIForceUpdate() bool {
+func (c *Client) canWebGUICommand() bool {
 	return strings.TrimSpace(c.cfg.WebGUICommandURL) != "" && strings.TrimSpace(c.cfg.WebGUICSRFToken) != ""
+}
+
+func (c *Client) canWebGUIEvents() bool {
+	return strings.TrimSpace(c.cfg.WebGUIEventsURL) != "" && strings.TrimSpace(c.cfg.WebGUICSRFToken) != ""
+}
+
+func (c *Client) webGUIRestartContainer(ctx context.Context, name string) error {
+	id, err := c.findContainerIDByName(ctx, name)
+	if err != nil {
+		return err
+	}
+	return c.doWebGUIEvent(ctx, "restart", id)
 }
 
 func (c *Client) webGUIUpdateContainer(ctx context.Context, name string) error {
@@ -885,6 +925,58 @@ func (c *Client) doWebGUICommand(ctx context.Context, cmd string) error {
 	form.Set("csrf_token", csrf)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, cmdURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	if cookie := strings.TrimSpace(c.cfg.WebGUICookie); cookie != "" {
+		req.Header.Set("Cookie", cookie)
+	}
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	b, _ := io.ReadAll(io.LimitReader(res.Body, 4<<10))
+	body := strings.TrimSpace(string(b))
+
+	if res.StatusCode < 200 || res.StatusCode > 299 {
+		return fmt.Errorf("unraid webgui http status %d: %s", res.StatusCode, body)
+	}
+
+	contentType := strings.ToLower(strings.TrimSpace(res.Header.Get("Content-Type")))
+	bodyLower := strings.ToLower(body)
+	if strings.Contains(bodyLower, "invalid csrf") || strings.Contains(bodyLower, "csrf") && strings.Contains(bodyLower, "invalid") {
+		return errors.New("unraid webgui csrf_token 无效或已过期")
+	}
+	if strings.Contains(contentType, "text/html") && strings.Contains(bodyLower, "login") && strings.Contains(bodyLower, "password") {
+		return errors.New("unraid webgui 可能未登录（请配置 unraid.webgui_cookie）或 csrf_token 已失效")
+	}
+	return nil
+}
+
+func (c *Client) doWebGUIEvent(ctx context.Context, action string, containerID string) error {
+	eventsURL := strings.TrimSpace(c.cfg.WebGUIEventsURL)
+	if eventsURL == "" {
+		eventsURL = deriveWebGUIEventsURL(c.cfg.Endpoint)
+	}
+	csrf := strings.TrimSpace(c.cfg.WebGUICSRFToken)
+	if eventsURL == "" || csrf == "" {
+		return errors.New("未配置 WebGUI Events 兜底（需配置 unraid.webgui_csrf_token，可选 unraid.webgui_cookie / unraid.webgui_events_url）")
+	}
+	if strings.TrimSpace(containerID) == "" {
+		return errors.New("container id 不能为空")
+	}
+
+	form := url.Values{}
+	form.Set("action", action)
+	form.Set("container", containerID)
+	form.Set("csrf_token", csrf)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, eventsURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		return err
 	}
