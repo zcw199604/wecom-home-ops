@@ -42,6 +42,9 @@ const (
 	EventKeyUnraidViewSystemStatsDetail = "unraid.view.system_stats_detail"
 	EventKeyUnraidViewLogs              = "unraid.view.logs"
 
+	EventKeyUnraidContainerSelectPrefix = "unraid.container.select."
+	EventKeyUnraidContainerPagePrefix   = "unraid.container.page."
+
 	EventKeyQinglongMenu                 = "qinglong.menu"
 	EventKeyQinglongInstanceSelectPrefix = "qinglong.instance.select."
 	EventKeyQinglongActionList           = "qinglong.action.list"
@@ -377,6 +380,67 @@ func NewUnraidOpsCard() TemplateCard {
 
 // NewUnraidActionCard 兼容旧命名：等价于 NewUnraidOpsCard。
 func NewUnraidActionCard() TemplateCard { return NewUnraidOpsCard() }
+
+type UnraidContainerOption struct {
+	Name string
+	Text string
+}
+
+func NewUnraidContainerSelectCard(actionDisplayName string, page int, totalPages int, containers []UnraidContainerOption, prevPage int, nextPage int) TemplateCard {
+	desc := "请选择容器"
+	if strings.TrimSpace(actionDisplayName) != "" {
+		desc = "动作：" + actionDisplayName
+	}
+	if page > 0 && totalPages > 0 {
+		desc = fmt.Sprintf("%s | %d/%d", desc, page, totalPages)
+	}
+
+	var buttons []map[string]interface{}
+	for _, c := range containers {
+		name := strings.TrimSpace(c.Name)
+		if name == "" {
+			continue
+		}
+		text := strings.TrimSpace(c.Text)
+		if text == "" {
+			text = name
+		}
+		buttons = append(buttons, map[string]interface{}{
+			"text":  text,
+			"style": 1,
+			"key":   EventKeyUnraidContainerSelectPrefix + name,
+		})
+	}
+	if prevPage > 0 {
+		buttons = append(buttons, map[string]interface{}{
+			"text":  "上一页",
+			"style": 2,
+			"key":   EventKeyUnraidContainerPagePrefix + intToString(prevPage),
+		})
+	}
+	if nextPage > 0 {
+		buttons = append(buttons, map[string]interface{}{
+			"text":  "下一页",
+			"style": 2,
+			"key":   EventKeyUnraidContainerPagePrefix + intToString(nextPage),
+		})
+	}
+	buttons = append(buttons, map[string]interface{}{
+		"text":  "动作菜单",
+		"style": 2,
+		"key":   EventKeyUnraidMenuOps,
+	})
+
+	card := TemplateCard{
+		"card_type": "button_interaction",
+		"main_title": map[string]interface{}{
+			"title": "选择容器",
+			"desc":  desc,
+		},
+		"button_list": buttons,
+	}
+	return applyDefaultSource(card)
+}
 
 func NewUnraidViewCard() TemplateCard {
 	card := TemplateCard{

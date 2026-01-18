@@ -37,6 +37,7 @@
 - wecom：模板卡片补齐 `source` 字段，修复部分客户端“发送成功但不展示”的问题
 - wecom/core：新增 `wecom.template_card_mode`（template_card/both/text）与“回复序号触发 EventKey”文本兜底，解决模板卡片不展示导致菜单无响应
 - core/unraid：支持菜单点击的“文本模式”兜底与文本确认（避免模板卡片不展示时无法继续）
+- wecom/unraid：模板卡片模式下，容器动作选择后改为“选择容器”卡片继续交互（不再提示输入容器名）
 - unraid：强制更新 mutation 回退识别增强（兼容 GraphQL 错误转义差异），自动回退尝试 `updateContainer/update`
 - unraid：当目标 Unraid 未提供更新相关 GraphQL mutation 时，强制更新可自动切换至 WebGUI 兜底（避免直接失败）
 - qinglong：移除 OpenAPI 请求中的 `t` 时间戳 query，修复部分版本参数校验导致任务列表 400 的问题

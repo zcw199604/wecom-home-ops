@@ -6,7 +6,7 @@
 ## 模块概述
 - **职责:** 连接管理（如 SSH/HTTP）；执行容器操作；错误归类与回显信息格式化；作为 Provider 接入企业微信交互
 - **状态:** 🚧开发中
-- **最后更新:** 2026-01-17
+- **最后更新:** 2026-01-18
 
 ## 规范
 
@@ -19,11 +19,19 @@
   - 说明：优先使用 Unraid GraphQL 提供相应 mutation；代码会自动回退尝试 `updateContainer(id: PrefixedID!)` 与 `update(id: PrefixedID!)`，如仍不一致再通过配置覆盖（见下文）
   - 兜底：当目标 Unraid 的 `DockerMutations` 不提供更新相关 mutation（GraphQL 校验错误）时，可启用 WebGUI StartCommand.php 兜底执行 `update_container <name>`（需配置 csrf_token，可能需要 Cookie）
 
+**交互（企业微信会话）:**
+- 模板卡片模式（`wecom.template_card_mode: template_card|both`）：动作选择后发送“选择容器”卡片，点击容器进入确认卡片（支持分页）。
+- 文本模式（`wecom.template_card_mode: text`）：按提示输入容器名（保留兼容）。
+
 ### 需求: 容器查看（状态/日志）
 **模块:** unraid
 对指定容器查看：
 - 状态（state/status）与运行时长（从 `status` 字符串解析，如 `Up 3 hours`）
 - 最新日志（默认 50 行，支持指定行数；输出有长度截断）
+
+**交互（企业微信会话）:**
+- 模板卡片模式：动作选择后发送“选择容器”卡片；日志默认拉取 50 行并回显。
+- 文本模式：可输入 `容器名 [行数]`（默认 50 行，最大 200 行）。
 
 ### 需求: 系统监控（系统资源概览/详情）
 **模块:** unraid
@@ -86,6 +94,7 @@ MVP 使用 Unraid Connect 插件提供的 GraphQL API（`/graphql` + `x-api-key`
 - 2026-01-17: 系统资源：内存已用按 total-available 口径展示，并补充容器累计网络 IO（stats.netIO 汇总）
 - 2026-01-17: 系统资源概览：补充 Unraid 启动时长与 UPS 信息（若可用）
 - 2026-01-17: 菜单：新增“系统监控”入口，系统资源从“容器查看”迁移
+- 2026-01-18: 企业微信模板卡片：容器动作选择后通过“选择容器”卡片继续交互（减少手动输入）
 - [202601141207_unraid_force_update_compat](../../history/2026-01/202601141207_unraid_force_update_compat/) - 强制更新回退兼容（错误转义差异）
 - [202601141334_unraid_force_update_webgui_fallback](../../history/2026-01/202601141334_unraid_force_update_webgui_fallback/) - 强制更新 WebGUI 兜底（StartCommand.php update_container）
 - [202601121216_unraid_container_inspect](../../history/2026-01/202601121216_unraid_container_inspect/) - 容器查看：状态/运行时长/资源使用/最新日志（按 GraphQL 能力探测）

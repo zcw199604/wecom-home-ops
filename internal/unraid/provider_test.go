@@ -175,8 +175,18 @@ func TestProvider_ViewFlowsAndLogTail(t *testing.T) {
 	if ok, err := p.HandleEvent(ctx, userID, wecom.IncomingMessage{EventKey: wecom.EventKeyUnraidStop}); err != nil || !ok {
 		t.Fatalf("HandleEvent(stop) ok=%v err=%v, want ok=true err=nil", ok, err)
 	}
-	if ok, err := p.HandleText(ctx, userID, "app"); err != nil || !ok {
-		t.Fatalf("HandleText(stop input) ok=%v err=%v, want ok=true err=nil", ok, err)
+
+	cards := rec.Cards()
+	if len(cards) == 0 {
+		t.Fatalf("want container select card")
+	}
+	mainTitle, _ := cards[len(cards)-1].Card["main_title"].(map[string]interface{})
+	if title, _ := mainTitle["title"].(string); title != "选择容器" {
+		t.Fatalf("container select title = %q, want %q", title, "选择容器")
+	}
+
+	if ok, err := p.HandleEvent(ctx, userID, wecom.IncomingMessage{EventKey: wecom.EventKeyUnraidContainerSelectPrefix + "app"}); err != nil || !ok {
+		t.Fatalf("HandleEvent(container select for stop) ok=%v err=%v, want ok=true err=nil", ok, err)
 	}
 	if ok, err := p.HandleConfirm(ctx, userID); err != nil || !ok {
 		t.Fatalf("HandleConfirm(stop) ok=%v err=%v, want ok=true err=nil", ok, err)
@@ -186,8 +196,8 @@ func TestProvider_ViewFlowsAndLogTail(t *testing.T) {
 	if ok, err := p.HandleEvent(ctx, userID, wecom.IncomingMessage{EventKey: wecom.EventKeyUnraidForceUpdate}); err != nil || !ok {
 		t.Fatalf("HandleEvent(force_update) ok=%v err=%v, want ok=true err=nil", ok, err)
 	}
-	if ok, err := p.HandleText(ctx, userID, "app"); err != nil || !ok {
-		t.Fatalf("HandleText(force_update input) ok=%v err=%v, want ok=true err=nil", ok, err)
+	if ok, err := p.HandleEvent(ctx, userID, wecom.IncomingMessage{EventKey: wecom.EventKeyUnraidContainerSelectPrefix + "app"}); err != nil || !ok {
+		t.Fatalf("HandleEvent(container select for force_update) ok=%v err=%v, want ok=true err=nil", ok, err)
 	}
 	if ok, err := p.HandleConfirm(ctx, userID); err != nil || !ok {
 		t.Fatalf("HandleConfirm(force_update) ok=%v err=%v, want ok=true err=nil", ok, err)

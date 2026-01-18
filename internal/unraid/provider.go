@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -116,6 +117,10 @@ func (p *Provider) HandleText(ctx context.Context, userID, content string) (bool
 		}
 
 	default:
+		// 兼容模板卡片流程：当已选择动作但 Step 为空时，允许直接输入容器名（例如卡片不展示/手动输入）。
+		if state.Step == "" && unraidActionNeedsContainer(state.Action) {
+			break
+		}
 		return false, nil
 	}
 
@@ -160,6 +165,15 @@ func (p *Provider) HandleText(ctx context.Context, userID, content string) (bool
 
 func (p *Provider) HandleEvent(ctx context.Context, userID string, msg wecom.IncomingMessage) (bool, error) {
 	key := strings.TrimSpace(msg.EventKey)
+	if strings.HasPrefix(key, wecom.EventKeyUnraidContainerSelectPrefix) {
+		suffix := strings.TrimPrefix(key, wecom.EventKeyUnraidContainerSelectPrefix)
+		return true, p.handleContainerSelect(ctx, userID, suffix)
+	}
+	if strings.HasPrefix(key, wecom.EventKeyUnraidContainerPagePrefix) {
+		suffix := strings.TrimPrefix(key, wecom.EventKeyUnraidContainerPagePrefix)
+		return true, p.handleContainerPage(ctx, userID, suffix)
+	}
+
 	switch key {
 	case wecom.EventKeyUnraidMenuOps:
 		p.state.Set(userID, core.ConversationState{ServiceKey: p.Key()})
@@ -182,21 +196,218 @@ func (p *Provider) HandleEvent(ctx context.Context, userID string, msg wecom.Inc
 		case core.ActionUnraidViewSystemStats, core.ActionUnraidViewSystemStatsDetail:
 			return true, p.execViewAndReply(ctx, userID, action, "", 0)
 		default:
-			p.state.Set(userID, core.ConversationState{
+			state := core.ConversationState{
 				ServiceKey: p.Key(),
-				Step:       core.StepAwaitingContainerName,
 				Action:     action,
-			})
-
-			prompt := fmt.Sprintf("已选择动作：%s\n请输入容器名：", action.DisplayName())
-			if action == core.ActionUnraidViewLogs {
-				prompt = fmt.Sprintf("已选择动作：%s\n请输入：容器名 [行数]（默认%d，最大%d）：", action.DisplayName(), defaultLogTail, maxLogTail)
 			}
-			return true, p.wecom.SendText(ctx, wecom.TextMessage{ToUser: userID, Content: prompt})
+			p.state.Set(userID, state)
+
+			if err := p.sendContainerSelectCard(ctx, userID, action, 1); err != nil {
+				state.Step = core.StepAwaitingContainerName
+				p.state.Set(userID, state)
+
+				prompt := fmt.Sprintf("已选择动作：%s\n请输入容器名：", action.DisplayName())
+				if action == core.ActionUnraidViewLogs {
+					prompt = fmt.Sprintf("已选择动作：%s\n请输入：容器名 [行数]（默认%d，最大%d）：", action.DisplayName(), defaultLogTail, maxLogTail)
+				}
+				return true, p.wecom.SendText(ctx, wecom.TextMessage{
+					ToUser:  userID,
+					Content: "获取容器列表失败，已切换为文本输入。\n" + prompt,
+				})
+			}
+			return true, nil
 		}
 	default:
 		return false, nil
 	}
+}
+
+func (p *Provider) handleContainerPage(ctx context.Context, userID string, pageStr string) error {
+	state, ok := p.state.Get(userID)
+	if !ok || state.ServiceKey != p.Key() || !unraidActionNeedsContainer(state.Action) {
+		_ = p.wecom.SendText(ctx, wecom.TextMessage{ToUser: userID, Content: "会话已过期，请重新选择动作。"})
+		_ = p.wecom.SendTemplateCard(ctx, wecom.TemplateCardMessage{ToUser: userID, Card: wecom.NewUnraidOpsCard()})
+		return nil
+	}
+
+	page, err := strconv.Atoi(strings.TrimSpace(pageStr))
+	if err != nil || page <= 0 {
+		return p.wecom.SendText(ctx, wecom.TextMessage{ToUser: userID, Content: "页码不合法，请重新选择。"})
+	}
+	return p.sendContainerSelectCard(ctx, userID, state.Action, page)
+}
+
+func (p *Provider) handleContainerSelect(ctx context.Context, userID string, containerNameRaw string) error {
+	containerName, err := core.ValidateContainerName(containerNameRaw)
+	if err != nil {
+		return p.wecom.SendText(ctx, wecom.TextMessage{
+			ToUser:  userID,
+			Content: fmt.Sprintf("容器名不合法：%s", err.Error()),
+		})
+	}
+
+	state, ok := p.state.Get(userID)
+	if !ok || state.ServiceKey != p.Key() || !unraidActionNeedsContainer(state.Action) {
+		_ = p.wecom.SendText(ctx, wecom.TextMessage{ToUser: userID, Content: "会话已过期，请重新选择动作。"})
+		_ = p.wecom.SendTemplateCard(ctx, wecom.TemplateCardMessage{ToUser: userID, Card: wecom.NewUnraidOpsCard()})
+		return nil
+	}
+
+	switch state.Action {
+	case core.ActionUnraidRestart, core.ActionUnraidStop, core.ActionUnraidForceUpdate:
+		state.Step = core.StepAwaitingConfirm
+		state.ContainerName = containerName
+		p.state.Set(userID, state)
+		return p.wecom.SendTemplateCard(ctx, wecom.TemplateCardMessage{
+			ToUser: userID,
+			Card:   wecom.NewConfirmCard(state.Action.DisplayName(), containerName),
+		})
+
+	case core.ActionUnraidViewStatus:
+		action := state.Action
+		state.Step = ""
+		state.Action = ""
+		state.ContainerName = ""
+		p.state.Set(userID, state)
+		return p.execViewAndReply(ctx, userID, action, containerName, 0)
+
+	case core.ActionUnraidViewLogs:
+		action := state.Action
+		state.Step = ""
+		state.Action = ""
+		state.ContainerName = ""
+		p.state.Set(userID, state)
+		return p.execViewAndReply(ctx, userID, action, containerName, defaultLogTail)
+
+	default:
+		return p.wecom.SendText(ctx, wecom.TextMessage{ToUser: userID, Content: "未知动作，请返回后重试。"})
+	}
+}
+
+const unraidContainerSelectPageSize = 3
+
+func (p *Provider) sendContainerSelectCard(ctx context.Context, userID string, action core.Action, page int) error {
+	if p.client == nil {
+		return errors.New("unraid client 未配置")
+	}
+
+	names, err := p.listContainerNames(ctx)
+	if err != nil {
+		return err
+	}
+	if len(names) == 0 {
+		return errors.New("未找到任何容器")
+	}
+
+	if page <= 0 {
+		page = 1
+	}
+	totalPages := (len(names) + unraidContainerSelectPageSize - 1) / unraidContainerSelectPageSize
+	if totalPages <= 0 {
+		totalPages = 1
+	}
+	if page > totalPages {
+		page = totalPages
+	}
+
+	start := (page - 1) * unraidContainerSelectPageSize
+	if start < 0 {
+		start = 0
+	}
+	if start >= len(names) {
+		start = (totalPages - 1) * unraidContainerSelectPageSize
+	}
+	end := start + unraidContainerSelectPageSize
+	if end > len(names) {
+		end = len(names)
+	}
+
+	var opts []wecom.UnraidContainerOption
+	for _, name := range names[start:end] {
+		n := strings.TrimSpace(name)
+		if n == "" {
+			continue
+		}
+		opts = append(opts, wecom.UnraidContainerOption{
+			Name: n,
+			Text: truncateRunes(n, 32),
+		})
+	}
+
+	prevPage := 0
+	nextPage := 0
+	if page > 1 {
+		prevPage = page - 1
+	}
+	if page < totalPages {
+		nextPage = page + 1
+	}
+
+	return p.wecom.SendTemplateCard(ctx, wecom.TemplateCardMessage{
+		ToUser: userID,
+		Card:   wecom.NewUnraidContainerSelectCard(action.DisplayName(), page, totalPages, opts, prevPage, nextPage),
+	})
+}
+
+func (p *Provider) listContainerNames(ctx context.Context) ([]string, error) {
+	if p.client == nil {
+		return nil, errors.New("unraid client 未配置")
+	}
+
+	const q = `query { docker { containers { id names state status } } }`
+	var resp struct {
+		Docker struct {
+			Containers []struct {
+				Names interface{} `json:"names"`
+			} `json:"containers"`
+		} `json:"docker"`
+	}
+	if err := p.client.do(ctx, q, nil, &resp); err != nil {
+		return nil, err
+	}
+
+	seen := make(map[string]struct{}, 64)
+	var names []string
+	for _, ct := range resp.Docker.Containers {
+		for _, n := range normalizeContainerNames(ct.Names) {
+			nn := normalizeName(n)
+			if nn == "" {
+				continue
+			}
+			if _, ok := seen[nn]; ok {
+				continue
+			}
+			seen[nn] = struct{}{}
+			names = append(names, nn)
+		}
+	}
+	sort.Strings(names)
+	return names, nil
+}
+
+func unraidActionNeedsContainer(action core.Action) bool {
+	switch action {
+	case core.ActionUnraidRestart, core.ActionUnraidStop, core.ActionUnraidForceUpdate,
+		core.ActionUnraidViewStatus, core.ActionUnraidViewLogs:
+		return true
+	default:
+		return false
+	}
+}
+
+func truncateRunes(s string, max int) string {
+	s = strings.TrimSpace(s)
+	if s == "" || max <= 0 {
+		return ""
+	}
+	i := 0
+	for idx := range s {
+		if i >= max {
+			return s[:idx] + "…"
+		}
+		i++
+	}
+	return s
 }
 
 func unraidViewTextMenu() string {
