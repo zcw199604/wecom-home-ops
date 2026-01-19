@@ -31,6 +31,7 @@
 - 文档：新增目标实例 `10.10.10.100` 的 GraphQL schema 摘要（Query/Mutation/Subscription + Docker/VM/Array 等关键字段清单）
 
 ### 修复
+- GitHub Actions：企业微信通知改用文本消息（text），并补充 commit message
 - wecom/qinglong：token 刷新引入 singleflight，避免并发刷新击穿与上游限流风险
 - core：StateStore 增加后台定时清理，避免过期状态长期驻留
 - wecom：回调增加请求体上限与短期去重，吸收重试并避免重复执行业务逻辑

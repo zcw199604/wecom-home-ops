@@ -57,23 +57,30 @@ jobs:
         continue-on-error: true
         env:
           WECHAT_CORP_ID: ${{ secrets.WECHAT_CORP_ID }}
+          WECHAT_CORP_SECRET: ${{ secrets.WECHAT_CORP_SECRET }}
+          WECHAT_AGENT_ID: ${{ secrets.WECHAT_AGENT_ID }}
+          WECHAT_TO_USER: ${{ secrets.WECHAT_TO_USER }}
+          WECHAT_API_URL: ${{ secrets.WECHAT_API_URL }}
         run: |
-          if [ -z "$WECHAT_CORP_ID" ]; then
+          if [ -z "$WECHAT_CORP_ID" ] || [ -z "$WECHAT_CORP_SECRET" ] || [ -z "$WECHAT_AGENT_ID" ] || [ -z "$WECHAT_TO_USER" ]; then
             echo "未配置企业微信通知，跳过"
             exit 0
           fi
 
-          WECHAT_API_URL="${{ secrets.WECHAT_API_URL }}"
-          if [ -z "$WECHAT_API_URL" ]; then
-            WECHAT_API_URL="https://qyapi.weixin.qq.com"
-          fi
+          case "$WECHAT_AGENT_ID" in
+            (*[!0-9]*)
+              echo "企业微信 WECHAT_AGENT_ID 非数字，跳过"
+              exit 0
+              ;;
+          esac
+
+          if [ -z "$WECHAT_API_URL" ]; then WECHAT_API_URL="https://qyapi.weixin.qq.com"; fi
           WECHAT_API_URL="${WECHAT_API_URL%/}"
 
-          ACCESS_TOKEN=$(
-            curl -s "${WECHAT_API_URL}/cgi-bin/gettoken?corpid=${{ secrets.WECHAT_CORP_ID }}&corpsecret=${{ secrets.WECHAT_CORP_SECRET }}" \
-              | grep -o '"access_token":"[^"]*"' \
-              | cut -d'"' -f4
-          )
+          ACCESS_TOKEN="$(
+            curl -s "${WECHAT_API_URL}/cgi-bin/gettoken?corpid=${WECHAT_CORP_ID}&corpsecret=${WECHAT_CORP_SECRET}" \
+              | python3 -c 'import json,sys; print(json.load(sys.stdin).get("access_token",""))' 2>/dev/null || true
+          )"
 
           if [ -z "$ACCESS_TOKEN" ]; then
             echo "企业微信 access_token 获取失败，跳过"
@@ -82,57 +89,82 @@ jobs:
 
           TAGS="${{ steps.meta.outputs.tags }}"
           TAGS_ONE_LINE=$(echo "$TAGS" | tr '\n' ',' | sed 's/,$//')
+          COMMIT_MESSAGE="$(git log -1 --pretty=%s 2>/dev/null || true)"
+          COMMIT_URL="${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          CONTENT="$(cat <<EOF
+          ✅ Docker 镜像构建成功
+          项目: ${{ github.event.repository.name }}
+          分支: ${{ github.ref_name }}
+          提交: ${GITHUB_SHA:0:7}
+          提交信息: ${COMMIT_MESSAGE}
+          提交者: ${{ github.actor }}
+          镜像: ${TAGS_ONE_LINE}
+          提交链接: ${COMMIT_URL}
+          详情: ${RUN_URL}
+          EOF
+          )"
+
+          PAYLOAD="$(CONTENT="$CONTENT" python3 -c 'import json,os; print(json.dumps({"touser": os.environ["WECHAT_TO_USER"], "msgtype": "text", "agentid": int(os.environ["WECHAT_AGENT_ID"]), "text": {"content": os.environ["CONTENT"]}}, ensure_ascii=False))')"
 
           curl -X POST "${WECHAT_API_URL}/cgi-bin/message/send?access_token=${ACCESS_TOKEN}" \
             -H 'Content-Type: application/json' \
-            -d @- <<EOF
-          {
-            "touser": "${{ secrets.WECHAT_TO_USER }}",
-            "msgtype": "markdown",
-            "agentid": ${{ secrets.WECHAT_AGENT_ID }},
-            "markdown": {
-              "content": "## ✅ Docker 镜像构建成功\n>项目: **${{ github.event.repository.name }}**\n>分支: \`${{ github.ref_name }}\`\n>提交: [\`${GITHUB_SHA:0:7}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})\n>提交者: ${{ github.actor }}\n>镜像: \`${TAGS_ONE_LINE}\`\n\n[查看详情](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-            }
-          }
-          EOF
+            -d "${PAYLOAD}"
 
       - name: 企业微信通知 - 构建失败
         if: failure()
         continue-on-error: true
         env:
           WECHAT_CORP_ID: ${{ secrets.WECHAT_CORP_ID }}
+          WECHAT_CORP_SECRET: ${{ secrets.WECHAT_CORP_SECRET }}
+          WECHAT_AGENT_ID: ${{ secrets.WECHAT_AGENT_ID }}
+          WECHAT_TO_USER: ${{ secrets.WECHAT_TO_USER }}
+          WECHAT_API_URL: ${{ secrets.WECHAT_API_URL }}
         run: |
-          if [ -z "$WECHAT_CORP_ID" ]; then
+          if [ -z "$WECHAT_CORP_ID" ] || [ -z "$WECHAT_CORP_SECRET" ] || [ -z "$WECHAT_AGENT_ID" ] || [ -z "$WECHAT_TO_USER" ]; then
             echo "未配置企业微信通知，跳过"
             exit 0
           fi
 
-          WECHAT_API_URL="${{ secrets.WECHAT_API_URL }}"
-          if [ -z "$WECHAT_API_URL" ]; then
-            WECHAT_API_URL="https://qyapi.weixin.qq.com"
-          fi
+          case "$WECHAT_AGENT_ID" in
+            (*[!0-9]*)
+              echo "企业微信 WECHAT_AGENT_ID 非数字，跳过"
+              exit 0
+              ;;
+          esac
+
+          if [ -z "$WECHAT_API_URL" ]; then WECHAT_API_URL="https://qyapi.weixin.qq.com"; fi
           WECHAT_API_URL="${WECHAT_API_URL%/}"
 
-          ACCESS_TOKEN=$(
-            curl -s "${WECHAT_API_URL}/cgi-bin/gettoken?corpid=${{ secrets.WECHAT_CORP_ID }}&corpsecret=${{ secrets.WECHAT_CORP_SECRET }}" \
-              | grep -o '"access_token":"[^"]*"' \
-              | cut -d'"' -f4
-          )
+          ACCESS_TOKEN="$(
+            curl -s "${WECHAT_API_URL}/cgi-bin/gettoken?corpid=${WECHAT_CORP_ID}&corpsecret=${WECHAT_CORP_SECRET}" \
+              | python3 -c 'import json,sys; print(json.load(sys.stdin).get("access_token",""))' 2>/dev/null || true
+          )"
 
           if [ -z "$ACCESS_TOKEN" ]; then
             echo "企业微信 access_token 获取失败，跳过"
             exit 0
           fi
 
+          COMMIT_MESSAGE="$(git log -1 --pretty=%s 2>/dev/null || true)"
+          COMMIT_URL="${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          CONTENT="$(cat <<EOF
+          ❌ Docker 镜像构建失败
+          项目: ${{ github.event.repository.name }}
+          分支: ${{ github.ref_name }}
+          提交: ${GITHUB_SHA:0:7}
+          提交信息: ${COMMIT_MESSAGE}
+          提交者: ${{ github.actor }}
+          提交链接: ${COMMIT_URL}
+          详情: ${RUN_URL}
+          EOF
+          )"
+
+          PAYLOAD="$(CONTENT="$CONTENT" python3 -c 'import json,os; print(json.dumps({"touser": os.environ["WECHAT_TO_USER"], "msgtype": "text", "agentid": int(os.environ["WECHAT_AGENT_ID"]), "text": {"content": os.environ["CONTENT"]}}, ensure_ascii=False))')"
+
           curl -X POST "${WECHAT_API_URL}/cgi-bin/message/send?access_token=${ACCESS_TOKEN}" \
             -H 'Content-Type: application/json' \
-            -d @- <<EOF
-          {
-            "touser": "${{ secrets.WECHAT_TO_USER }}",
-            "msgtype": "markdown",
-            "agentid": ${{ secrets.WECHAT_AGENT_ID }},
-            "markdown": {
-              "content": "## ❌ Docker 镜像构建失败\n>项目: **${{ github.event.repository.name }}**\n>分支: \`${{ github.ref_name }}\`\n>提交: [\`${GITHUB_SHA:0:7}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})\n>提交者: ${{ github.actor }}\n>失败原因: 请查看日志\n\n<font color=\\\"warning\\">[立即查看失败日志](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})</font>"
-            }
-          }
-          EOF
+            -d "${PAYLOAD}"
