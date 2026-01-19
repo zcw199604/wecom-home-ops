@@ -56,6 +56,7 @@
 - unraid：系统资源概览补充 Unraid 启动时长与 UPS 信息（若可用）
 - unraid：菜单新增“系统监控”入口，系统资源从“容器查看”迁移
 - Docker：运行时镜像改为 scratch 并合并构建步骤，减少镜像层数
+- 构建：升级 Go 工具链至 1.25.6（go.mod toolchain / Dockerfile）
 
 ## [0.1.0] - 2026-01-12
 

@@ -40,6 +40,7 @@
 | 202601181834 | cicd_wechat_notify | 功能 | ✅已完成 | [202601181834_cicd_wechat_notify](2026-01/202601181834_cicd_wechat_notify/) |
 | 202601181902 | wecom_unraid_container_select_card | 修复 | ✅已完成 | [202601181902_wecom_unraid_container_select_card](2026-01/202601181902_wecom_unraid_container_select_card/) |
 | 202601181941 | unraid_restart_webgui | 修复 | ✅已完成 | [202601181941_unraid_restart_webgui](2026-01/202601181941_unraid_restart_webgui/) |
+| 202601190202 | go_1256 | 变更 | ✅已完成 | [202601190202_go_1256](2026-01/202601190202_go_1256/) |
 
 ---
 
@@ -79,3 +80,4 @@
 - [202601181834_cicd_wechat_notify](2026-01/202601181834_cicd_wechat_notify/) - GitHub Actions Docker 构建结果企业微信通知（成功/失败）
 - [202601181902_wecom_unraid_container_select_card](2026-01/202601181902_wecom_unraid_container_select_card/) - 模板卡片模式下容器选择卡片化（Unraid）
 - [202601181941_unraid_restart_webgui](2026-01/202601181941_unraid_restart_webgui/) - Unraid 重启优先走 WebGUI Events.php（action=restart）
+- [202601190202_go_1256](2026-01/202601190202_go_1256/) - Go 工具链升级到 1.25.6（go.mod / Dockerfile）
